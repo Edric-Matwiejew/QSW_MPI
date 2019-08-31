@@ -1,0 +1,11 @@
+numpy
+scipy
+mpi4py
+h5py
+networkx
+freeqsw
+MPI
+operators
+io
+plot
+measure
