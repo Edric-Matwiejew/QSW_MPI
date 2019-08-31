@@ -1,0 +1,40 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module foperators ! in 
+    interface  ! in :foperators
+        subroutine graph(gamma,rows,nnz,row_starts_in,col_indexes_in,values_in,row_starts_out,col_indexes_out,values_out,nnz_out) ! in :foperators:foperators.f90
+            real(kind=8) intent(in) :: gamma
+            integer, optional,intent(in),check((len(row_starts_in)-1)>=rows),depend(row_starts_in) :: rows=(len(row_starts_in)-1)
+            integer, optional,intent(in),check(len(col_indexes_in)>=nnz),depend(col_indexes_in) :: nnz=len(col_indexes_in)
+            integer dimension(rows + 1),intent(in) :: row_starts_in
+            integer dimension(nnz),intent(in) :: col_indexes_in
+            complex(kind=8) dimension(nnz),intent(in),depend(nnz) :: values_in
+            integer dimension(rows + 1),intent(out),depend(rows) :: row_starts_out
+            integer dimension(nnz + rows),intent(out),depend(rows,nnz) :: col_indexes_out
+            complex(kind=8) dimension(nnz + rows),intent(out),depend(rows,nnz) :: values_out
+            integer intent(out) :: nnz_out
+        end subroutine graph
+        subroutine site_lindblads(rows,nnz,row_starts_in,col_indexes_in,values_in,row_starts_out,col_indexes_out,values_out,nnz_out) ! in :foperators:foperators.f90
+            integer, optional,intent(in),check((len(row_starts_in)-1)>=rows),depend(row_starts_in) :: rows=(len(row_starts_in)-1)
+            integer, optional,intent(in),check(len(col_indexes_in)>=nnz),depend(col_indexes_in) :: nnz=len(col_indexes_in)
+            integer dimension(rows + 1),intent(in) :: row_starts_in
+            integer dimension(nnz),intent(in) :: col_indexes_in
+            complex(kind=8) dimension(nnz),intent(in),depend(nnz) :: values_in
+            integer dimension(rows + 1),intent(out),depend(rows) :: row_starts_out
+            integer dimension(nnz + rows),intent(out),depend(rows,nnz) :: col_indexes_out
+            complex(kind=8) dimension(nnz + rows),intent(out),depend(rows,nnz) :: values_out
+            integer intent(out) :: nnz_out
+        end subroutine site_lindblads
+        subroutine symmetrise(rows,nnz,row_starts,col_indexes,values) ! in :foperators:foperators.f90
+            integer, optional,intent(in),check((len(row_starts)-1)>=rows),depend(row_starts) :: rows=(len(row_starts)-1)
+            integer, optional,intent(in),check(len(col_indexes)>=nnz),depend(col_indexes) :: nnz=len(col_indexes)
+            integer dimension(rows + 1),intent(in) :: row_starts
+            integer dimension(nnz),intent(in) :: col_indexes
+            complex(kind=8), target,dimension(nnz),intent(inout),depend(nnz) :: values
+        end subroutine symmetrise
+    end interface 
+end python module foperators
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
