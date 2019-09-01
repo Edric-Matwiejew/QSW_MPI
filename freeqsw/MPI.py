@@ -197,9 +197,14 @@ class walk(object):
                 self.partition_table,
                 self.MPI_communicator.py2f())
 
+        if self.flock > 1:
+            total_receives = np.sum(self.M_num_rec_inds)
+        else:
+            total_receives = 1
+
         self.M_local_col_inds, self.M_rhs_send_inds = fMPI.rec_b(
                 self.M_rows,
-                np.sum(self.M_num_rec_inds),
+                total_receives,
                 self.M_row_starts,
                 self.M_col_indexes,
                 self.M_num_rec_inds,
