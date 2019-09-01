@@ -62,8 +62,6 @@ class walk(object):
 
     :return: A distributed :class:`walk` object containing an initialized \
             superoperator.
-
-
     """
     def __init__(
             self,
@@ -142,6 +140,12 @@ class walk(object):
             self.sink_rates = [0]
 
         self.size = (H.shape[0] + self.pad, H.shape[1] + self.pad)
+
+        if self.source_sites[-1] > H.shape[0] - 1:
+            raise IndexError("Maximum source site index not in range of H.")
+
+        if self.sink_sites[-1] > H.shape[0] - 1:
+            raise IndexError("Maximum sink site index not in range of H.")
 
         self.construct_superoperator()
 
@@ -375,7 +379,6 @@ class walk(object):
 
         if precision is None:
             precision = "dp"
-
 
         rhot_v = fMPI.step(
                 self.M_rows,

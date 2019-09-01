@@ -12,7 +12,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 #Graph = nx.star_graph(10)
-Graph = nx.path_graph(4096)
+Graph = nx.path_graph(10)
 print("graph")
 G = nx.to_scipy_sparse_matrix(Graph, dtype=np.complex128)
 
@@ -25,16 +25,16 @@ L = qsw.operators.site_lindblads(H)
 qsw.operators.symmetrise(H)
 
 source_sites = np.array([1,9])
-source_rates = np.array([10.0,15.0])
-sink_sites = np.array([0])
-sink_rates = np.array([0.5])
+source_rates = np.array([2,3])
+sink_sites = np.array([8, 2])
+sink_rates = np.array([0.5, 0.9])
 
 sources = (source_sites, source_rates)
 sinks = (sink_sites, sink_rates)
 
-#test_system = qsw.MPI.walk(0.00, H, L, comm, sources = sources, sinks = sinks)
 start = time.time()
-test_system = qsw.MPI.walk(1.00, H, L, comm)
+test_system = qsw.MPI.walk(1.00, H, L, comm, sources = sources, sinks = sinks)
+#test_system = qsw.MPI.walk(1.00, H, L, comm)
 
 print("SIS")
 test_system.File('test', action = "w")
