@@ -58,7 +58,7 @@ subroutine  Super_Operator_Extent( omega, &
         integer :: ierr
         integer :: i
 
-        if (source_sites(1) == -1) then
+        if (source_sites(1) < 0) then
             allocate(source_sites_temp(0))
             allocate(source_rates_temp(0))
         else
@@ -75,7 +75,7 @@ subroutine  Super_Operator_Extent( omega, &
 
         endif
 
-        if (sink_sites(1) == -1) then
+        if (sink_sites(1) < 0) then
             allocate(sink_sites_temp(0))
             allocate(sink_rates_temp(0))
         else
