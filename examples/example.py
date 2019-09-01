@@ -6,12 +6,14 @@ from scipy import sparse as sp
 from mpi4py import MPI
 import networkx as nx
 import freeqsw as qsw
+import time
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 #Graph = nx.star_graph(10)
-Graph = nx.path_graph(4097)
+Graph = nx.path_graph(4096)
+print("graph")
 G = nx.to_scipy_sparse_matrix(Graph, dtype=np.complex128)
 
 np.random.seed(10)
@@ -31,9 +33,10 @@ sources = (source_sites, source_rates)
 sinks = (sink_sites, sink_rates)
 
 #test_system = qsw.MPI.walk(0.00, H, L, comm, sources = sources, sinks = sinks)
-print("SIS")
+start = time.time()
 test_system = qsw.MPI.walk(1.00, H, L, comm)
 
+print("SIS")
 test_system.File('test', action = "w")
 #test_system.initial_state('sources')
 
@@ -43,10 +46,11 @@ test_system.step(100, save = True, precision = "sp")
 #test_system.series(0.0, 60.0, 100, save = True)
 #test_system.set_omega(0.1)
 #test_system.series(0.0, 60.0, 100, save = True)
+finish = time.time()
 print("STEP")
 
 if rank is 0:
-
+    print(finish - start)
     walks = qsw.io.File('test.qsw')
 
     walks.list_steps()
@@ -54,7 +58,7 @@ if rank is 0:
     #pops_2 = qsw.measure.populations(File = walks, series_name = 'series 2')
 
     print(pops_1[3])
-    print(np.sum(pops_1[3]))
+    print(np.sum(pops_1))
     #print(pops_2[3])
     #print(np.sum(pops_2[3]))
 

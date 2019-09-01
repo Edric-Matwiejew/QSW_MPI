@@ -1,0 +1,17 @@
+__pycache__
+*.h5
+*.hdf5
+*.pyc
+*.out
+*.npz
+*.mod
+*.o
+*.so
+*.txt
+*.npy
+*.dat
+*.log
+*.swp
+*src/examples/pyopenqw.py
+*.qsw
+*.pyc
