@@ -1,6 +1,6 @@
 #FC := mpifort -fopenmp -g -fcheck=array-temps,bounds,do,mem,pointer,recursion
-FC := mpifort -g -fcheck=array-temps,bounds,do,mem,pointer,recursion
-#FC := mpifort -fopenmp
+FC := mpifort -g -fbounds-check
+#FC := mpifort -fopenmp -O3 -ffast-math -funroll-loops -mtune=native
 
 OBJDIR := obj
 

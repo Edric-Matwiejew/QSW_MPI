@@ -184,9 +184,6 @@ def animate(G,
         node_list.append(node)
 
     if layout is None:
-        #fixed_positions = {0:(0,0)}
-        #fixed_nodes = fixed_positions.keys()
-        #layout = nx.spring_layout(Gaug, iterations = 500, fixed = fixed_nodes, pos=fixed_positions)
         layout = nx.spring_layout(Gaug, iterations = 500)
 
     if title is None:

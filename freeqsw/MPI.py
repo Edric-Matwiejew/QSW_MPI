@@ -74,8 +74,6 @@ class walk(object):
             sources = (None, None),
             sinks = (None, None)):
 
-        self.__check_omega(omega)
-
         self.MPI_communicator = MPI_communicator
         self.flock = self.MPI_communicator.Get_size()
         self.rank = self.MPI_communicator.Get_rank()

@@ -992,6 +992,10 @@ module Operators
 
         call Prefix_Sum(L_inout%row_starts)
 
+        write(*,*) L_inout%row_starts
+        write(*,*) L_inout%col_indexes
+        write(*,*) L_inout%values
+
     end subroutine Transport_Lindblads
 
     subroutine Generate_Coherent_Transport_Superoperator(H, &
