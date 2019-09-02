@@ -11,38 +11,41 @@ import glob
 from memory_profiler import profile
 
 def get_files(path):
-	files=glob.glob(path)
-	sizes = []
-	for fi in files:
-		sizes.append(glob.os.path.getsize(fi))
-	files = [x for _, x in sorted(zip(sizes,files))]
-	return files
+        files=glob.glob(path)
+        sizes = []
+        for fi in files:
+                sizes.append(glob.os.path.getsize(fi))
+        files = [x for _, x in sorted(zip(sizes,files))]
+        return files
 
 @profile
 def benchmark(files):
-	total_time_start = time.time()
-	for fi in files:
+    for fi in files:
+        total_time_start = time.time()
 
-		G = sp.load_npz(fi)
-		H = qsw.operators.graph(1.0, G)
-		L = qsw.operators.site_lindblads(H)
-		qsw.operators.symmetrise(H)
+        if rank == 0:
+            print(fi)
 
-		test_system = qsw.MPI.walk(0.01, H, L, comm)
-		test_system.initial_state('even')
-		start = time.time()
-		rhot = test_system.step(100, target = 0, precision = "sp")
-		finish = time.time()
+        G = sp.load_npz(fi)
+        H = qsw.operators.graph(1.0, G)
+        L = qsw.operators.site_lindblads(H)
+        qsw.operators.symmetrise(H)
 
-	total_time_end = time.time()
+        test_system = qsw.MPI.walk(0.01, H, L, comm)
+        test_system.initial_state('even')
+        start = time.time()
+        rhot = test_system.step(100, target = 0, precision = "sp")
+        finish = time.time()
 
-	if rank is 0:
-		print(fi + 'step time: ' + str(finish - start))
-		print(fi + 'total time: ' + str(total_time_end - total_time_start))
+        total_time_end = time.time()
 
-		pops = qsw.measure.populations(rho = rhot)
+        if rank is 0:
+            print(fi + 'step time: ' + str(finish - start))
+            print(fi + 'total time: ' + str(total_time_end - total_time_start))
 
-		print(fi + '' + str(np.sum(pops)))
+            pops = qsw.measure.populations(rho = rhot)
+
+            print(fi + ' ' + str(np.sum(pops)))
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
