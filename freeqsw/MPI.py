@@ -5,6 +5,7 @@ import h5py
 import freeqsw.operators as operators
 import freeqsw.fMPI as fMPI
 import freeqsw.io as io
+import time
 
 def load_walk(
         omega,
@@ -160,6 +161,7 @@ class walk(object):
         if (self.omega < 0) or (self.omega > 1):
             raise ValueError("Parameter omega must satify 0 <= omega =< 1.")
 
+        start = time.time()
         self.M_nnz, self.M_rows, self.partition_table = fMPI.super_operator_extent(
                 self.omega,
                 self.H.indptr,
@@ -194,6 +196,12 @@ class walk(object):
                 self.flock,
                 self.MPI_communicator.py2f())
 
+        finish = time.time()
+
+        if self.rank == 0:
+            print('built superoperator ' + str(finish - start))
+
+        start = time.time()
         self.M_num_rec_inds, self.M_rec_disps, self.M_num_send_inds, self.M_send_disps = fMPI.rec_a(
                 self.M_rows,
                 self.M_row_starts,
@@ -217,7 +225,12 @@ class walk(object):
                 self.M_send_disps,
                 self.partition_table,
                 self.MPI_communicator.py2f())
+        finish = time.time()
 
+        if self.rank == 0:
+            print('reconciled sends ' + str(finish - start))
+
+        start = time.time()
         self.one_norms, self.p = fMPI.one_norm_series(
                 self.M_rows,
                 self.M_row_starts,
@@ -231,6 +244,10 @@ class walk(object):
                 self.M_rhs_send_inds,
                 self.partition_table,
                 self.MPI_communicator.py2f())
+        finish = time.time()
+
+        if self.rank == 0:
+            print('one_norms ' + str(finish - start))
 
     def set_omega(self, omega):
         """Re-sets the interpolation paramater (:math:`\omega`) \
