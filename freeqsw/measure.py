@@ -2,6 +2,8 @@ import numpy as np
 from scipy import sparse as sp
 
 def populations(rho = None, File = None, step_name = None, series_name = None):
+    """Return the populations of a density matrix or density matrix series.
+    """
 
     if rho is not None:
         if rho.ndim is 2:

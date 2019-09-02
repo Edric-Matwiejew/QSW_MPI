@@ -12,7 +12,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 #Graph = nx.star_graph(10)
-Graph = nx.path_graph(10)
+Graph = nx.path_graph(1000)
 print("graph")
 G = nx.to_scipy_sparse_matrix(Graph, dtype=np.complex128)
 

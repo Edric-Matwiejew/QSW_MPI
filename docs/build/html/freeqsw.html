@@ -1,0 +1,521 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Modules &mdash; FreeQSW 1.0.0 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Introduction" href="intro.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> FreeQSW
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Modules</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#mpi">MPI</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-freeqsw.io">io</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-freeqsw.measure">measure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-freeqsw.operators">operators</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-freeqsw.plot">plot</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">FreeQSW</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Modules</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/freeqsw.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="modules">
+<h1>Modules<a class="headerlink" href="#modules" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="mpi">
+<h2>MPI<a class="headerlink" href="#mpi" title="Permalink to this headline">¶</a></h2>
+<p>This contents of this module will only operate correctly if called within an MPI instance.</p>
+<span class="target" id="module-freeqsw.MPI"></span><dl class="function">
+<dt id="freeqsw.MPI.load_walk">
+<code class="sig-prename descclassname">freeqsw.MPI.</code><code class="sig-name descname">load_walk</code><span class="sig-paren">(</span><em class="sig-param">omega</em>, <em class="sig-param">filename</em>, <em class="sig-param">MPI_communicator</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.load_walk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize a previously created <a class="reference internal" href="#freeqsw.MPI.walk" title="freeqsw.MPI.walk"><code class="xref py py-class docutils literal notranslate"><span class="pre">walk</span></code></a> using a .qsw file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>omega</strong> (<em>numpy.real64</em>) – Interpolation paramater (<span class="math notranslate nohighlight">\(\omega\)</span>)             in the stochastic walk master equation,             must satisfy <span class="math notranslate nohighlight">\(0 \geq \omega \leq 1\)</span>.</p></li>
+<li><p><strong>filename</strong> (<em>str</em>) – Target file. Must have a .qsw extention and not be currently open.</p></li>
+<li><p><strong>MPI_communicator</strong> (<em>MPI intracommunicator</em>) – An MPI communicator created using mpi4py.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A <a class="reference internal" href="#freeqsw.MPI.walk" title="freeqsw.MPI.walk"><code class="xref py py-class docutils literal notranslate"><span class="pre">walk</span></code></a> object initialized using the input systems’s H, L,             sources, and sinks data. The <code class="xref py py-class docutils literal notranslate"><span class="pre">walk.file</span></code> parameter is set to the             input file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="freeqsw.MPI.walk">
+<em class="property">class </em><code class="sig-prename descclassname">freeqsw.MPI.</code><code class="sig-name descname">walk</code><span class="sig-paren">(</span><em class="sig-param">omega</em>, <em class="sig-param">H</em>, <em class="sig-param">L</em>, <em class="sig-param">MPI_communicator</em>, <em class="sig-param">sources=(None</em>, <em class="sig-param">None)</em>, <em class="sig-param">sinks=(None</em>, <em class="sig-param">None)</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.walk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>The <a class="reference internal" href="#freeqsw.MPI.walk" title="freeqsw.MPI.walk"><code class="xref py py-class docutils literal notranslate"><span class="pre">walk</span></code></a> object handels the creation of distributed superoperators, density matrices and system propagation in an MPI environment. It also enables the saving of results and input data to a .qsw file. This object and its contianing methods will only function correctly if called within an MPI instance, as shown in the examples.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>omega</strong> (<em>numpy.real64</em>) – Interpolation paramater (<span class="math notranslate nohighlight">\(\omega\)</span>)         in the stochastic walk master equation,         must satisfy <span class="math notranslate nohighlight">\(0 \geq \omega \leq 1\)</span>.</p></li>
+<li><p><strong>H</strong> (<em>numpy.complex128</em>) – The system Hamiltonian, a Hermitian matrix.</p></li>
+<li><p><strong>L</strong> (<em>numpy.complex128</em>) – Matrix resulting from summation of the system Lindblad operators.            May be non-hermitian.</p></li>
+<li><p><strong>MPI_communicator</strong> (<em>MPI intracommunicator</em>) – An MPI communicator created using mpi4py.</p></li>
+<li><p><strong>sources</strong> (<em>(</em><em>numpy.int32</em><em>, </em><em>numpy.float64</em><em>)</em><em>, </em><em>optional</em>) – Tuple containing a list of  absorption sites and the             corresponding absorption rates.</p></li>
+<li><p><strong>sinks</strong> (<em>(</em><em>numpy.int32</em><em>, </em><em>numpy.float64</em><em>)</em><em>, </em><em>optional</em>) – Tuple containing a list of the emission sites and the            corresponding absorption rates.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A distributed <a class="reference internal" href="#freeqsw.MPI.walk" title="freeqsw.MPI.walk"><code class="xref py py-class docutils literal notranslate"><span class="pre">walk</span></code></a> object containing an initialized             superoperator.</p>
+</dd>
+</dl>
+<dl class="method">
+<dt id="freeqsw.MPI.walk.File">
+<code class="sig-name descname">File</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">action='a'</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.walk.File" title="Permalink to this definition">¶</a></dt>
+<dd><p>Associate a .qsw file with the <a class="reference internal" href="#freeqsw.MPI.walk" title="freeqsw.MPI.walk"><code class="xref py py-class docutils literal notranslate"><span class="pre">walk</span></code></a> object.</p>
+<p>If the file does not exist it is created, otherwise it is         checked for consistency with the system of the walk. This file         may then be used to automatically save results obtained by         <a class="reference internal" href="#freeqsw.MPI.walk.step" title="freeqsw.MPI.walk.step"><code class="xref py py-meth docutils literal notranslate"><span class="pre">step()</span></code></a> and <a class="reference internal" href="#freeqsw.MPI.walk.series" title="freeqsw.MPI.walk.series"><code class="xref py py-meth docutils literal notranslate"><span class="pre">series()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<em>str</em>) – Filename of the .qsw file, or filename of the .qsw                 to be created. It must end with a .qsw extension.</p></li>
+<li><p><strong>action</strong> (<em>str</em>) – “a”, open or create file. “w” create file, overwrite if it already exists.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.MPI.walk.construct_superoperator">
+<code class="sig-name descname">construct_superoperator</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.walk.construct_superoperator" title="Permalink to this definition">¶</a></dt>
+<dd><p>A distributed superoperator is constructed on <a class="reference internal" href="#freeqsw.MPI.walk" title="freeqsw.MPI.walk"><code class="xref py py-class docutils literal notranslate"><span class="pre">walk</span></code></a> initialization                or on calling <a class="reference internal" href="#freeqsw.MPI.walk.set_omega" title="freeqsw.MPI.walk.set_omega"><code class="xref py py-meth docutils literal notranslate"><span class="pre">set_omega()</span></code></a>. One-norms                 of the superoperator power series are calculated for using in                 deriving the optimal matrix exponentiation parameters when calling                 <a class="reference internal" href="#freeqsw.MPI.walk.step" title="freeqsw.MPI.walk.step"><code class="xref py py-meth docutils literal notranslate"><span class="pre">step()</span></code></a> and <a class="reference internal" href="#freeqsw.MPI.walk.series" title="freeqsw.MPI.walk.series"><code class="xref py py-meth docutils literal notranslate"><span class="pre">series()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.MPI.walk.initial_state">
+<code class="sig-name descname">initial_state</code><span class="sig-paren">(</span><em class="sig-param">state</em>, <em class="sig-param">name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.walk.initial_state" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the initial state of the density operator (<span class="math notranslate nohighlight">\(\rho\)</span>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> (<em>np.complex128</em><em> or </em><em>str</em>) – </p>
+</dd>
+</dl>
+<p>Possible input are:</p>
+<ul class="simple">
+<li><p>A 2D-array with shape equal to H.shape or shape equal to H.shape                 + the number of sources and sinks.</p></li>
+<li><p>A 1D-array with length equal to the diagonal of H or length equal to the                 diagonal of H + the number of sources and sinks. This describes an                 inital state with no coherences.</p></li>
+<li><p>‘sources’ - evenly distribute the initial state over                 all specified sources.</p></li>
+<li><p>‘even’ - evenly distribute the initial state over all                 sites, including an specified sources and sinks.</p></li>
+</ul>
+<p>If needed the array will be padded to match the shape of the system operators                 after the addtion of absorption and emission sites (sources and sinks).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – An identifying name for the initial state, for use when saving                 or loading states from a .qsw file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.MPI.walk.series">
+<code class="sig-name descname">series</code><span class="sig-paren">(</span><em class="sig-param">t1</em>, <em class="sig-param">t2</em>, <em class="sig-param">steps</em>, <em class="sig-param">target=None</em>, <em class="sig-param">save=False</em>, <em class="sig-param">name=None</em>, <em class="sig-param">precision=None</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.walk.series" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the state of the system over the time interval t1 to t2.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t1</strong> (<em>numpy.float64</em>) – The starting time, must statisfy <span class="math notranslate nohighlight">\(0 \ge t\)</span>.</p></li>
+<li><p><strong>t2</strong> (<em>numpy.float64</em>) – The ending time, must statisfy <span class="math notranslate nohighlight">\(t1 \ge t2\)</span>.</p></li>
+<li><p><strong>steps</strong> – The number of evenly spaced points in time to calculate.</p></li>
+<li><p><strong>target</strong> (<em>int</em><em>, </em><em>optional</em>) – MPI rank to receive the calculated density operator, <span class="math notranslate nohighlight">\(\rho(t)\)</span>.</p></li>
+<li><p><strong>save</strong> (<em>True</em><em> or </em><em>False</em><em>, </em><em>optional</em>) – If True, save the result to an associated .qsw file.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name under which to save the result, if None it defaults to ‘series + &lt;sequential number&gt;’.</p></li>
+<li><p><strong>precision</strong> (<em>str</em><em>, </em><em>optional</em>) – Target precision, accepts “sp” for single precision and “dp” for double precision. Defaults to “dp”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return rhot</dt>
+<dd class="field-even"><p>If <strong>target</strong> is specified the <span class="math notranslate nohighlight">\(\rho(t)\)</span> is returned to the target rank.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.complex128</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>At minimum a <strong>target</strong> must be specified, or <strong>save</strong> must be ‘True’.</p>
+</div>
+</dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.MPI.walk.set_omega">
+<code class="sig-name descname">set_omega</code><span class="sig-paren">(</span><em class="sig-param">omega</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.walk.set_omega" title="Permalink to this definition">¶</a></dt>
+<dd><p>Re-sets the interpolation paramater (<span class="math notranslate nohighlight">\(\omega\)</span>)             in the stochastic walk master equation. This triggers             <a class="reference internal" href="#freeqsw.MPI.walk.construct_superoperator" title="freeqsw.MPI.walk.construct_superoperator"><code class="xref py py-func docutils literal notranslate"><span class="pre">construct_superoperator()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>omega</strong> (<em>numpy.real64</em>) – Must satisfy <span class="math notranslate nohighlight">\(0 \geq \omega \leq 1\)</span>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.MPI.walk.step">
+<code class="sig-name descname">step</code><span class="sig-paren">(</span><em class="sig-param">t</em>, <em class="sig-param">target=None</em>, <em class="sig-param">save=False</em>, <em class="sig-param">name=None</em>, <em class="sig-param">precision=None</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.MPI.walk.step" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the state of the system at time t.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t</strong> (<em>numpy.float64</em>) – The time, must statisfy <span class="math notranslate nohighlight">\(0 \ge t\)</span>.</p></li>
+<li><p><strong>target</strong> (<em>int</em><em>, </em><em>optional</em>) – MPI rank to receive the calculated density operator, <span class="math notranslate nohighlight">\(\rho(t)\)</span>.</p></li>
+<li><p><strong>save</strong> (<em>True</em><em> or </em><em>False</em><em>, </em><em>optional</em>) – If True, save the result to an associated .qsw file.</p></li>
+<li><p><strong>name</strong> (<em>str</em><em>, </em><em>optional</em>) – Name under which to save the result, if None it defaults to ‘step + &lt;sequential number&gt;’.</p></li>
+<li><p><strong>precision</strong> (<em>str</em><em>, </em><em>optional</em>) – Target precision, accepts “sp” for single precision and “dp” for double precision. Defaults to “dp”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return rhot</dt>
+<dd class="field-even"><p>If <strong>target</strong> is specified the <span class="math notranslate nohighlight">\(\rho(t)\)</span> is returned to the target rank.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.complex128</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>At minimum a <strong>target</strong> must be specified, or <strong>save</strong> must be ‘True’.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-freeqsw.io">
+<span id="io"></span><h2>io<a class="headerlink" href="#module-freeqsw.io" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="freeqsw.io.File">
+<em class="property">class </em><code class="sig-prename descclassname">freeqsw.io.</code><code class="sig-name descname">File</code><span class="sig-paren">(</span><em class="sig-param">filename</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="freeqsw.io.File.H">
+<code class="sig-name descname">H</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.H" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.L">
+<code class="sig-name descname">L</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.L" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.close">
+<code class="sig-name descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.close" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.initial_state">
+<code class="sig-name descname">initial_state</code><span class="sig-paren">(</span><em class="sig-param">state</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.initial_state" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.list_series">
+<code class="sig-name descname">list_series</code><span class="sig-paren">(</span><em class="sig-param">spacing=15</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.list_series" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.list_steps">
+<code class="sig-name descname">list_steps</code><span class="sig-paren">(</span><em class="sig-param">spacing=15</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.list_steps" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.load_csr">
+<code class="sig-name descname">load_csr</code><span class="sig-paren">(</span><em class="sig-param">group</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.load_csr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.series">
+<code class="sig-name descname">series</code><span class="sig-paren">(</span><em class="sig-param">name</em>, <em class="sig-param">spacing=15</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.series" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.sinks">
+<code class="sig-name descname">sinks</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.sinks" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.sources">
+<code class="sig-name descname">sources</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.sources" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.step">
+<code class="sig-name descname">step</code><span class="sig-paren">(</span><em class="sig-param">name</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.step" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="freeqsw.io.File.system_attributes">
+<code class="sig-name descname">system_attributes</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.File.system_attributes" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="freeqsw.io.load_system">
+<code class="sig-prename descclassname">freeqsw.io.</code><code class="sig-name descname">load_system</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">MPI_communicator</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.load_system" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="freeqsw.io.set_file">
+<code class="sig-prename descclassname">freeqsw.io.</code><code class="sig-name descname">set_file</code><span class="sig-paren">(</span><em class="sig-param">filename</em>, <em class="sig-param">H</em>, <em class="sig-param">L</em>, <em class="sig-param">source_sites</em>, <em class="sig-param">source_rates</em>, <em class="sig-param">sink_sites</em>, <em class="sig-param">sink_rates</em>, <em class="sig-param">action='a'</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.io.set_file" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+<div class="section" id="module-freeqsw.measure">
+<span id="measure"></span><h2>measure<a class="headerlink" href="#module-freeqsw.measure" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="freeqsw.measure.populations">
+<code class="sig-prename descclassname">freeqsw.measure.</code><code class="sig-name descname">populations</code><span class="sig-paren">(</span><em class="sig-param">rho=None</em>, <em class="sig-param">File=None</em>, <em class="sig-param">step_name=None</em>, <em class="sig-param">series_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.measure.populations" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the populations of a density matrix or density matrix series.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>rho</strong> – A dens</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="section" id="module-freeqsw.operators">
+<span id="operators"></span><h2>operators<a class="headerlink" href="#module-freeqsw.operators" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="freeqsw.operators.graph">
+<code class="sig-prename descclassname">freeqsw.operators.</code><code class="sig-name descname">graph</code><span class="sig-paren">(</span><em class="sig-param">gamma</em>, <em class="sig-param">A</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.operators.graph" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate the graph Laplacian from an adjacency matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>gamma</strong> (<em>numpy.real64</em>) – Scaling factor, must satisty 0 &lt;<span class="math notranslate nohighlight">\(\gamma\)</span>.</p></li>
+<li><p><strong>A</strong> (<em>csr_matrix</em>) – Graph adjacency matrix.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>csr_matrix</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="freeqsw.operators.site_lindblads">
+<code class="sig-prename descclassname">freeqsw.operators.</code><code class="sig-name descname">site_lindblads</code><span class="sig-paren">(</span><em class="sig-param">G</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.operators.site_lindblads" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate a Lindblad operator matrix from a graph Laplacician.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>A</strong> (<em>csr_matrix</em>) – Graph Laplacian.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>csr_matrix</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="freeqsw.operators.symmetrise">
+<code class="sig-prename descclassname">freeqsw.operators.</code><code class="sig-name descname">symmetrise</code><span class="sig-paren">(</span><em class="sig-param">G</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.operators.symmetrise" title="Permalink to this definition">¶</a></dt>
+<dd><p>Symmetrise a csr_matrix with a symmetric structure.</p>
+<p>G is altered so as to satisfy <span class="math notranslate nohighlight">\(G_{ij} = max(G_{ij}, G_{ji})\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>G</strong> (<em>csr_matrix</em>) – Matrix to symmetrise.</p>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The matrix must be structurally symmetric in terms of its non-zero entires.</p>
+</div>
+</dd></dl>
+
+</div>
+<div class="section" id="module-freeqsw.plot">
+<span id="plot"></span><h2>plot<a class="headerlink" href="#module-freeqsw.plot" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="freeqsw.plot.animate">
+<code class="sig-prename descclassname">freeqsw.plot.</code><code class="sig-name descname">animate</code><span class="sig-paren">(</span><em class="sig-param">G</em>, <em class="sig-param">populations</em>, <em class="sig-param">start</em>, <em class="sig-param">end</em>, <em class="sig-param">filename</em>, <em class="sig-param">node_size=1000</em>, <em class="sig-param">framerate=25</em>, <em class="sig-param">graph_color='orange'</em>, <em class="sig-param">layout=None</em>, <em class="sig-param">title=None</em>, <em class="sig-param">sources=None</em>, <em class="sig-param">sinks=None</em>, <em class="sig-param">size=(5</em>, <em class="sig-param">5)</em>, <em class="sig-param">use_labels=False</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.plot.animate" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="freeqsw.plot.graph">
+<code class="sig-prename descclassname">freeqsw.plot.</code><code class="sig-name descname">graph</code><span class="sig-paren">(</span><em class="sig-param">G</em>, <em class="sig-param">filename</em>, <em class="sig-param">sources=None</em>, <em class="sig-param">sinks=None</em>, <em class="sig-param">title=None</em>, <em class="sig-param">title_font_size=16</em>, <em class="sig-param">layout=None</em>, <em class="sig-param">graph_color='yellow'</em>, <em class="sig-param">source_color='lightgreen'</em>, <em class="sig-param">sink_color='pink'</em>, <em class="sig-param">size=(5</em>, <em class="sig-param">5)</em>, <em class="sig-param">format='png'</em>, <em class="sig-param">node_labels=True</em>, <em class="sig-param">node_font_size=8</em>, <em class="sig-param">node_size=400</em>, <em class="sig-param">legend=None</em>, <em class="sig-param">legend_font_size=12</em>, <em class="sig-param">legend_key_size=300</em>, <em class="sig-param">legend_label_graph='graph'</em>, <em class="sig-param">legend_label_source='source'</em>, <em class="sig-param">legend_label_sink='sink'</em><span class="sig-paren">)</span><a class="headerlink" href="#freeqsw.plot.graph" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="intro.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, Edric Matwiejew
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
