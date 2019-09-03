@@ -61,7 +61,6 @@ module One_Norms
             j = i - 1
 
             do while (j >= 1)
-                !write(*,*) array(j), temp 
                 if (array(j) >= temp) exit
                     array(j + 1) = array(j)
                     indices(j + 1) = indices(j)
@@ -211,7 +210,7 @@ module One_Norms
         complete = .false.
         k = 1
 
-        spmm_time = 0
+        est_old = 0
 
         do
 

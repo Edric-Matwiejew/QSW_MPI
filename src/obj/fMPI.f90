@@ -123,7 +123,7 @@ subroutine  Super_Operator_Extent( omega, &
 
         L%rows = H_rows
         L%columns = H_rows
-        
+
         !$omp parallel do
         do i = 1, H_rows + 1
             L%row_starts(i) = L_row_starts(i) + 1
@@ -157,8 +157,12 @@ subroutine  Super_Operator_Extent( omega, &
         M_rows = M%columns
         partition_table = partition_table_temp
 
-end subroutine Super_Operator_Extent
+        deallocate(M%values, M%row_starts, M%col_indexes)
+        deallocate(L%values, L%row_starts, L%col_indexes)
+        deallocate(H%values, H%row_starts, H%col_indexes)
 
+
+end subroutine Super_Operator_Extent
 
 subroutine  Super_Operator( omega, &
                             H_rows, &
@@ -289,7 +293,7 @@ subroutine  Super_Operator( omega, &
 
         L%rows = H_rows
         L%columns = H_rows
-        
+
         !$omp parallel do
         do i = 1, H_rows + 1
             L%row_starts(i) = L_row_starts(i) + 1
@@ -322,6 +326,9 @@ subroutine  Super_Operator( omega, &
         M_row_starts = M%row_starts
         M_col_indexes(1:size(M%col_indexes)) = M%col_indexes
         M_values(1:size(M%col_indexes)) = M%values
+
+        deallocate(L%values, L%row_starts, L%col_indexes)
+        deallocate(H%values, H%row_starts, H%col_indexes)
 
 end subroutine Super_Operator
 
@@ -381,8 +388,6 @@ subroutine rec_a(   M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
 
         call Reconcile_Communications_A(M, partition_table, MPI_communicator)
-
-        call MPI_barrier(MPI_communicator, ierr)
 
 end subroutine rec_a
 
@@ -568,7 +573,6 @@ subroutine one_norm_series( M_rows, &
 
             alphas(i) = one_norm_array(i)**(1_dp/real(i,8))
 
-
             if (i >= 3) then
                 if((abs((alphas(i - 1) - alphas(i))/alphas(i)) < 0.5)) then
                     p = i - 1
@@ -578,7 +582,8 @@ subroutine one_norm_series( M_rows, &
 
         enddo
 
-        call MPI_Barrier(MPI_communicator, ierr)
+        deallocate(M_T%values, M_T%row_starts, M_T%local_col_inds, M_T%col_indexes, &
+            M_T%num_rec_inds, M_T%rec_disps, M_T%num_send_inds, M_T%send_disps, M_T%RHS_send_inds)
 
 end subroutine one_norm_series
 
@@ -728,7 +733,7 @@ subroutine gather_step( M_local_rows, &
 
     integer, intent(in) :: M_local_rows
     complex(8), dimension(M_local_rows), intent(in) :: rhot_v
-    integer, intent(in) :: flock 
+    integer, intent(in) :: flock
     integer, dimension(flock + 1), intent(in) :: partition_table
     integer, intent(in) :: root
     integer, intent(in) :: MPI_communicator
@@ -867,7 +872,7 @@ subroutine gather_series(   M_local_rows, &
     integer, intent(in) :: M_local_rows
     integer, intent(in) :: steps
     complex(8), dimension(M_local_rows, steps + 1), intent(in) :: rhot_v_series
-    integer, intent(in) :: flock 
+    integer, intent(in) :: flock
     integer, dimension(flock + 1), intent(in) :: partition_table
     integer, intent(in) :: root
     integer, intent(in) :: MPI_communicator
@@ -887,5 +892,5 @@ subroutine gather_series(   M_local_rows, &
                                 MPI_communicator)
 
     call Reshape_Vectorized_Operator_Series( rhot_v_series_gathered, rhot_series)
-    
+
 end subroutine gather_series

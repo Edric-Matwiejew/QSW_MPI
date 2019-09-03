@@ -465,7 +465,6 @@ module Expm
 
         endif
 
-        A_temp = A
         A_temp%rows = A%rows
         A_temp%columns = A%columns
         A_temp%row_starts => A%row_starts
@@ -548,6 +547,19 @@ module Expm
             !$omp end parallel do
 
         enddo
+
+        ! Final call to deallocate saved arrays.
+        call SpMV_Series(   A_temp, &
+                            B_temp_1, &
+                            partition_table, &
+                            0, &
+                            0, &
+                            0, &
+                            rank, &
+                            B_temp_2, &
+                            mpi_communicator)
+
+        deallocate(A_temp%values)
 
     end subroutine Expm_Multiply
 

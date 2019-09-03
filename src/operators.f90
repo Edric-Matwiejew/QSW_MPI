@@ -159,7 +159,7 @@ module Operators
         complex(dp), dimension(:), allocatable :: value_elements_shifted
         complex(dp), dimension(:), allocatable :: nz_diag
         integer, dimension(:), allocatable :: col_index
-        integer, dimension(:), allocatable, target :: row_start
+        integer, dimension(:), allocatable :: row_start
 
         integer :: lower_offset, upper_offset
 
@@ -314,7 +314,7 @@ module Operators
         integer, dimension(:), allocatable :: left, right
         complex(dp), dimension(:), allocatable :: diag_val
 
-        integer, dimension(:), allocatable, target :: row_start
+        integer, dimension(:), allocatable :: row_start
 
         integer :: lower_offset, upper_offset
 
@@ -1363,6 +1363,9 @@ module Operators
                                                     U_bound, &
                                                     M_local)
 
+            deallocate(H_aug%row_starts, H_aug%col_indexes, H_aug%values)
+            deallocate(L_aug%row_starts, L_aug%col_indexes, L_aug%values)
+
             elseif (omega .ge. (1.0_dp - delta)) then
 
                 call Add_Sources_and_Sinks( L, &
@@ -1396,6 +1399,9 @@ module Operators
                                                         L_bound, &
                                                         U_bound, &
                                                         M_local)
+
+            deallocate(H_aug%row_starts, H_aug%col_indexes, H_aug%values)
+            deallocate(L_aug%row_starts, L_aug%col_indexes, L_aug%values)
 
             endif
 
@@ -1433,10 +1439,6 @@ module Operators
             endif
 
         endif
-
-        call Reconcile_Communications(  M_local, &
-                                        partition_table, &
-                                        MPI_communicator)
 
     end subroutine Prepare_Super_Operator
 

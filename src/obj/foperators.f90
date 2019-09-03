@@ -76,6 +76,8 @@ subroutine graph(   gamma, &
     enddo
     !$omp end parallel do
 
+    deallocate(A%row_starts, A%col_indexes, A%values)
+
 end subroutine graph
 
 subroutine site_lindblads(  rows, &
@@ -154,6 +156,7 @@ subroutine site_lindblads(  rows, &
     enddo
     !$omp end parallel do
 
+    deallocate(A%row_starts, A%col_indexes, A%values)
 
 end subroutine site_lindblads
 
@@ -208,5 +211,7 @@ subroutine symmetrise(  rows, &
         values(i) = values_temp(i)
     enddo
     !$omp end parallel do
+
+    deallocate(A%row_starts, A%col_indexes)
 
 end subroutine symmetrise

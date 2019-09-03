@@ -968,6 +968,8 @@ module Sparse
             A_T%row_starts(i) = A_T%row_starts(i) + A_T%row_starts(i - 1)
         enddo
 
+        call MPI_barrier(MPI_communicator, ierr)
+
     end subroutine CSR_Dagger
 
     subroutine Reconcile_Communications(A, &
@@ -1311,6 +1313,16 @@ module Sparse
             allocate(u_resize(lb:ub_resize))
             allocate(rec_values(num_rec))
             allocate(send_values(num_send))
+        endif
+
+        !Calling with start_it = 0 and max_it = 0 clears the saved arrays if need.
+        if ((start_it == 0) .and. (max_it == 0)) then
+            if (allocated(u_resize)) then
+                deallocate(u_resize)
+                deallocate(rec_values)
+                deallocate(send_values)
+            endif
+            return
         endif
 
         u_resize(lb:ub) = u_local
