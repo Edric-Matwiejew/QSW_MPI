@@ -15,21 +15,35 @@ module load h5py
 
 export OMP_NUM_THREADS=1
 
-echo "1"
-time srun --export=ALL -N 5 -n 120 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
-echo "2"
-time srun --export=ALL -N 5 -n 64 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
-echo "4"
-time srun --export=ALL -N 5 -n 32 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
-echo "8"
-time srun --export=ALL -N 5 -n 16 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
-echo "16"
-time srun --export=ALL -N 5 -n 8 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
-echo "32"
-time srun --export=ALL -N 5 -n 4 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
-echo "64"
-time srun --export=ALL -N 5 -n 2 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
-echo "120"
-time srun --export=ALL -N 5 -n 1 -c 1 --cpu_bind=sockets mprof run --include-children magnus_bench.py
+mkdir graphs/line_graphs/sym
+mkdir graphs/grid_graphs/sym
+mkdir graphs/random_graphs/sym
+mkdir graphs/complete_graphs/sym
 
+python graphgen.py
 
+echo "FreeQSW benchmarks" > benchmarks.dat
+
+echo "Line Graphs" >> benchmarks.dat
+for file in graphs/line_graphs/*.npz
+do
+	(time srun -N 5 -n 120 -c 1 python3 benchmark_steps.py $file 'benchmark_lines.csv') &>> benchmarks.dat
+done
+
+echo "Square Grids" >> benchmarks.dat
+for file in graphs/grid_graphs/*.npz
+do
+	(time srun -N 5 -n 120 -c 1 python3 benchmark_steps.py $file 'benchmark_grids.csv') &>> benchmarks.dat
+done
+
+echo "Random Graphs" >> benchmarks.dat
+for file in graphs/random_graphs/*.npz
+do
+	(time srun -N 5 -n 120 -c 1 python3 benchmark_steps.py $file 'benchmark_randoms.csv') &>> benchmarks.dat
+done
+
+echo "Complete Graphs" >> benchmarks.dat
+for file in graphs/complete_graphs/*.npz
+do
+	(time srun -N 5 -n 120 -c 1 python3 benchmark_steps.py $file 'benchmark_completes.csv') &>> benchmarks.dat
+done

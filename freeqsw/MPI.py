@@ -198,8 +198,7 @@ class walk(object):
 
         finish = time.time()
 
-        if self.rank == 0:
-            print('built superoperator ' + str(finish - start))
+        self.construction_time = finish - start
 
         start = time.time()
         self.M_num_rec_inds, self.M_rec_disps, self.M_num_send_inds, self.M_send_disps = fMPI.rec_a(
@@ -227,8 +226,7 @@ class walk(object):
                 self.MPI_communicator.py2f())
         finish = time.time()
 
-        if self.rank == 0:
-            print('reconciled sends ' + str(finish - start))
+        self.reconcile_time = finish - start
 
         start = time.time()
         self.one_norms, self.p = fMPI.one_norm_series(
@@ -246,8 +244,7 @@ class walk(object):
                 self.MPI_communicator.py2f())
         finish = time.time()
 
-        if self.rank == 0:
-            print('one_norms ' + str(finish - start))
+        self.one_norm_time = finish - start
 
     def set_omega(self, omega):
         """Re-sets the interpolation paramater (:math:`\omega`) \
@@ -542,4 +539,3 @@ class walk(object):
                                                 self.size)
 
             return rhot_series.T
-

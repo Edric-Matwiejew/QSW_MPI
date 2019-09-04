@@ -59,4 +59,3 @@ def symmetrise(G):
     check_indices(G)
 
     foperators.symmetrise(G.indptr, G.indices, G.data)
-

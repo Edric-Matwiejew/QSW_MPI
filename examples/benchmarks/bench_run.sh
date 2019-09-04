@@ -1,6 +1,11 @@
 #!/bin/bash
 export OMP_NUM_THREADS=1
 
+mkdir graphs/line_graphs/sym
+mkdir graphs/grid_graphs/sym
+mkdir graphs/random_graphs/sym
+mkdir graphs/complete_graphs/sym
+
 echo "FreeQSW benchmarks" > benchmarks.dat
 
 echo "Line Graphs" >> benchmarks.dat
