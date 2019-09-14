@@ -494,7 +494,7 @@ module One_Norms
         real(dp), dimension(:), allocatable :: one_norms_local, one_norms
         real(dp) :: local_max
 
-        integer :: lb, ub
+        integer :: lb_elements, ub_elements
         integer :: i, j
 
         !MPI ENVIRONMENT
@@ -504,8 +504,8 @@ module One_Norms
 
         call MPI_comm_rank(MPI_comm_world, rank, ierr)
 
-        lb = partition_table(rank + 1)
-        ub = partition_table(rank + 2) - 1
+        lb_elements = A%row_starts(partition_table(rank + 1))
+        ub_elements = A%row_starts(partition_table(rank + 2)) - 1
 
         allocate(one_norms_local(A%columns))
 
@@ -522,7 +522,7 @@ module One_Norms
         !$omp end parallel do
 
         !$omp parallel do
-        do j = A%row_starts(lb), A%row_starts(ub)
+        do j = lb_elements, ub_elements
             one_norms_local(A%col_indexes(j)) = abs(A%values(j)) + &
                 one_norms_local(A%col_indexes(j))
         enddo

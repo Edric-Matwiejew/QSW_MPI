@@ -178,9 +178,8 @@ class walk(object):
                 self.MPI_communicator.py2f())
 
         self.M_local_rows = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
-        self.M_n_row_starts = np.max([2, self.M_local_rows + 1])
 
-        self.M_row_starts, self.M_col_indexes, self.M_values, self.mu = fMPI.super_operator(
+        self.M_row_starts, self.M_col_indexes, self.M_values = fMPI.super_operator(
                 self.omega,
                 self.H.indptr,
                 self.H.indices,
@@ -193,7 +192,7 @@ class walk(object):
                 self.sink_sites,
                 self.sink_rates,
                 self.M_nnz,
-                self.M_n_row_starts,
+                self.M_local_rows,
                 self.flock,
                 self.MPI_communicator.py2f())
 
@@ -229,24 +228,13 @@ class walk(object):
 
         self.reconcile_time = finish - start
 
-        start = time.time()
-
-        #self.one_norms, self.p = fMPI.one_norm_series(
-        #        self.M_rows,
-        #        self.M_row_starts,
-        #        [],
-        #        [],
-        #        self.M_num_rec_inds,
-        #        self.M_rec_disps,
-        #        self.M_num_send_inds,
-        #        self.M_send_disps,
-        #        [],
-        #        self.M_rhs_send_inds,
-        #        self.partition_table,
-        #        self.MPI_communicator.py2f())
-
-
-        self.one_norms, self.p = fMPI.one_norm_series(
+        if self.rank == 0:
+            self.M_row_starts = np.array([1,1], dtype=np.int32)
+            print([self.rank, self.M_row_starts, self.M_local_rows, self.M_nnz, self.M_values, self.M_rows, self.M_col_indexes, \
+                    self.M_values, self.M_num_rec_inds, self.M_local_col_inds])
+            #self.MPI_communicator.barrier()
+        #start = time.time()
+        (self.one_norms, self.p) = fMPI.one_norm_series(
                 self.M_rows,
                 self.M_row_starts,
                 self.M_col_indexes,
@@ -261,7 +249,7 @@ class walk(object):
                 self.MPI_communicator.py2f())
         finish = time.time()
 
-        self.one_norm_time = finish - start
+        #self.one_norm_time = finish - start
 
     def set_omega(self, omega):
         """Re-sets the interpolation paramater (:math:`\omega`) \
@@ -422,7 +410,6 @@ class walk(object):
                 self.M_send_disps,
                 self.M_local_col_inds,
                 self.M_rhs_send_inds,
-                self.mu,
                 t,
                 self.rho_v,
                 self.partition_table,
@@ -510,7 +497,6 @@ class walk(object):
                                     self.M_send_disps, \
                                     self.M_local_col_inds, \
                                     self.M_rhs_send_inds, \
-                                    self.mu, \
                                     t1, \
                                     t2, \
                                     self.rho_v, \

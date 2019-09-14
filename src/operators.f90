@@ -4,6 +4,8 @@ module Operators
     use :: Sparse
     use :: MPI
 
+    implicit none
+
     contains
 
     function Kronecker_Delta(i, j)
@@ -794,11 +796,7 @@ module Operators
 
         allocate(B%row_starts(lower_bound:upper_bound + 1))
 
-        !$omp parallel do
-        do i = lower_bound, upper_bound + 1
-            B%row_starts(i) = row_start(i)
-        enddo
-        !$omp end parallel do
+        B%row_starts = row_start(lower_bound:upper_bound + 1)
 
         B%rows = upper_bound - lower_bound + 1
         B%columns = H%columns**2
@@ -958,6 +956,8 @@ module Operators
         type(CSR), intent(out) :: L_inout
 
         integer :: augs
+
+        integer :: i
 
         augs = size(source_sites) + size(sink_sites)
 
