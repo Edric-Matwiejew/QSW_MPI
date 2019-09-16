@@ -16,4 +16,7 @@ __pycache__
 *.qsw
 *.pyc
 *.npz
+*.mtx
+*.jpg
+*.jpeg
 junk

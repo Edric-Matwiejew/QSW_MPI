@@ -1561,6 +1561,168 @@ module Sparse
 
     end subroutine Reconcile_Communications_B
 
+    subroutine Merge_CSR(   column_indexes, &
+                            values, &
+                            start, &
+                            mid, &
+                            finish)
 
+        integer, intent(inout), dimension(:) :: column_indexes
+        complex(dp), intent(inout), dimension(:) :: values
+        integer, intent(in) :: start
+        integer, intent(in) :: mid
+        integer, intent(in) :: finish
+
+        integer, dimension(:), allocatable :: col_ind_temp
+        complex(dp), dimension(:), allocatable :: val_temp
+        integer :: i, j, k
+
+        allocate(col_ind_temp(finish - start + 1))
+        allocate(val_temp(finish - start + 1))
+
+        i = start
+        j = mid + 1
+        k = 1
+
+        do while (i <= mid .and. j <= finish)
+
+            if (column_indexes(i) <= column_indexes(j)) then
+                col_ind_temp(k) = column_indexes(i)
+                val_temp(k) = values(i)
+                k = k + 1
+                i = i + 1
+            else
+                col_ind_temp(k) = column_indexes(j)
+                val_temp(k) = values(j)
+                k = k + 1
+                j = j+ 1
+            endif
+
+        enddo
+
+        do while (i <= mid)
+            col_ind_temp(k) = column_indexes(i)
+            val_temp(k) = values(i)
+            k = k + 1
+            i = i + 1
+        enddo
+
+        do while (j <= finish)
+            col_ind_temp(k) = column_indexes(j)
+            val_temp(k) = values(j)
+            k = k + 1
+            j = j + 1
+        enddo
+
+        do i = start, finish
+            column_indexes(i) = col_ind_temp(i - start + 1)
+            values(i) = val_temp(i - start + 1)
+        enddo
+
+    end subroutine Merge_CSR
+
+    subroutine Insertion_Sort_CSR(   column_indexes, &
+                                        values)
+
+        integer, intent(inout), dimension(:) :: column_indexes
+        complex(dp), intent(inout), dimension(:) :: values
+
+        integer :: col_ind_temp
+        complex(dp) :: val_temp
+
+        integer :: i, j
+
+        do i = 2, size(column_indexes)
+
+            col_ind_temp = column_indexes(i)
+            val_temp = values(i)
+
+            j = i - 1
+
+            do while (j >= 1)
+
+                if (column_indexes(j) <= col_ind_temp) exit
+                    column_indexes(j + 1) = column_indexes(j)
+                    values(j + 1) = values(j)
+                    j = j - 1
+            enddo
+            column_indexes(j + 1) = col_ind_temp
+            values(j + 1) = val_temp
+
+        enddo
+
+    end subroutine Insertion_Sort_CSR
+
+    recursive subroutine Merge_Sort_CSR( column_indexes, &
+                                            values, &
+                                            start, &
+                                            finish)
+
+        integer, intent(inout), dimension(:) :: column_indexes
+        complex(dp), intent(inout), dimension(:) :: values
+        integer, intent(in) :: start
+        integer, intent(in) :: finish
+
+        integer :: mid
+
+        if (start < finish) then
+            if (finish - start >= 512) then
+
+                mid = (start + finish) / 2
+
+                !$omp taskgroup
+
+                !$omp task shared(column_indexes, values) untied, &
+                !$omp& if(finish - start >= 256)
+                call Merge_Sort_CSR( column_indexes, &
+                                        values, &
+                                        start, &
+                                        mid)
+                !$omp end task
+
+                !$omp task shared(column_indexes, values) untied, &
+                !$omp& if(finish - start >= 256)
+                call Merge_Sort_CSR( column_indexes, &
+                                        values, &
+                                        mid + 1, &
+                                        finish)
+                !$omp end task
+
+                !$omp taskyield
+
+                !$omp end taskgroup
+
+                call Merge_CSR(  column_indexes, &
+                                    values, &
+                                    start, &
+                                    mid, &
+                                    finish)
+
+            else
+                call insertion_sort_CSR( column_indexes(start:finish), &
+                                            values(start:finish))
+            endif
+        endif
+
+    end subroutine Merge_Sort_CSR
+
+    subroutine Sort_CSR(A)
+
+        type(CSR), intent(inout) :: A
+
+        integer :: i
+
+        do i = lbound(A%row_starts,1), ubound(A%row_starts,1) - 1
+            !$omp parallel
+            !$omp single
+            call Merge_Sort_CSR(A%col_indexes(A%row_starts(i):A%row_starts(i + 1) - 1), &
+                                A%values(A%row_starts(i):A%row_starts(i + 1) - 1), &
+                                1, &
+                                A%row_starts(i + 1) - A%row_starts(i))
+            !$omp end single
+            !$omp end parallel
+        enddo
+
+    end subroutine Sort_CSR
 
 end module Sparse

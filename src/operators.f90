@@ -95,7 +95,6 @@ module Operators
         enddo
         !$omp end parallel do
 
-        !!$omp parallel do private(j,k) firstprivate(offset)
         do i = 1, A%rows - 1
             do j = A%row_starts(i), A%row_starts(i+1) - 1
                 if (A%col_indexes(j) > i) then
@@ -117,7 +116,6 @@ module Operators
                 endif
             enddo
         enddo
-        !!$omp end parallel do
 
     end subroutine Symmetrise_Graph_Weights
 
@@ -126,7 +124,14 @@ module Operators
         type(CSR), intent(in) :: A
         type(CSR), intent(out) :: L
 
-        integer :: i
+        integer, dimension(:), allocatable :: row_offsets
+
+        integer :: i, j
+
+        !sort
+        complex(dp) :: temp
+        integer :: temp_indx
+        integer :: k
 
         allocate(L%row_starts(size(A%row_starts)))
         allocate(L%col_indexes(size(A%col_indexes)))
@@ -136,17 +141,44 @@ module Operators
         L%columns = A%columns
 
         !$omp parallel do
-        do i = 1, size(L%col_indexes)
-            L%col_indexes(i) = A%col_indexes(i)
-            L%values(i) = sqrt(abs(A%values(i)))
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
         do i = 1, L%rows + 1
             L%row_starts(i) = A%row_starts(i)
         enddo
         !$omp end parallel do
+
+        allocate(row_offsets(L%rows))
+
+        row_offsets = 0
+
+        do i = 1, A%rows
+            do j= A%row_starts(i), A%row_starts(i + 1) - 1
+            L%values(A%row_starts(A%col_indexes(j)) + row_offsets(A%col_indexes(j))) = &
+                sqrt(abs(A%values(j)))
+            L%col_indexes(A%row_starts(A%col_indexes(j)) + row_offsets(A%col_indexes(j))) = &
+                i
+            row_offsets(A%col_indexes(j)) = row_offsets(A%col_indexes(j)) + 1
+            enddo
+        enddo
+
+        !!$omp parallel do private(i, temp, temp_indx, j)
+        !do k = 1, L%rows
+        !    do i = L%row_starts(k) + 1, L%row_starts(k + 1) - 1
+        !        temp = L%values(i)
+        !        temp_indx = L%col_indexes(i)
+        !        j = i - 1
+        !        do while (j >= L%row_starts(k) )
+        !            if (L%col_indexes(j) <= temp_indx) exit
+        !                L%values(j + 1) = L%values(j)
+        !                L%col_indexes(j + 1) = L%col_indexes(j)
+        !                j = j - 1
+        !        enddo
+        !        L%values(j + 1) = temp
+        !        L%col_indexes(j + 1) = temp_indx
+        !    enddo
+        !enddo
+        !!$omp end parallel do
+
+        call Sort_CSR(L)
 
     end subroutine Generate_Scattering_Lindblad_Operators
 
@@ -801,23 +833,25 @@ module Operators
         B%rows = upper_bound - lower_bound + 1
         B%columns = H%columns**2
 
-        !$omp parallel do private(i, temp, temp_indx, j)
-        do k = lower_bound, upper_bound
-            do i = B%row_starts(k) + 1, B%row_starts(k + 1) - 1
-                temp = B%values(i)
-                temp_indx = B%col_indexes(i)
-                j = i - 1
-                do while (j >= B%row_starts(k) )
-                    if (B%col_indexes(j) <= temp_indx) exit
-                        B%values(j + 1) = B%values(j)
-                        B%col_indexes(j + 1) = B%col_indexes(j)
-                        j = j - 1
-                enddo
-                B%values(j + 1) = temp
-                B%col_indexes(j + 1) = temp_indx
-            enddo
-        enddo
-        !$omp end parallel do
+        !!$omp parallel do private(i, temp, temp_indx, j)
+        !do k = lower_bound, upper_bound
+        !    do i = B%row_starts(k) + 1, B%row_starts(k + 1) - 1
+        !        temp = B%values(i)
+        !        temp_indx = B%col_indexes(i)
+        !        j = i - 1
+        !        do while (j >= B%row_starts(k) )
+        !            if (B%col_indexes(j) <= temp_indx) exit
+        !                B%values(j + 1) = B%values(j)
+        !                B%col_indexes(j + 1) = B%col_indexes(j)
+        !                j = j - 1
+        !        enddo
+        !        B%values(j + 1) = temp
+        !        B%col_indexes(j + 1) = temp_indx
+        !    enddo
+        !enddo
+        !!$omp end parallel do
+
+        call Sort_CSR(B)
 
     end subroutine Generate_Stochastic_Superoperator
 
@@ -1275,23 +1309,25 @@ module Operators
         B%rows = upper_bound - lower_bound + 1
         B%columns = H%columns**2
 
-        !$omp parallel do private(j, temp, temp_indx)
-        do k = lower_bound, upper_bound
-            do i = B%row_starts(k) + 1, B%row_starts(k + 1) - 1
-                temp = B%values(i)
-                temp_indx = B%col_indexes(i)
-                j = i - 1
-                do while (j >= B%row_starts(k) )
-                    if (B%col_indexes(j) <= temp_indx) exit
-                        B%values(j + 1) = B%values(j)
-                        B%col_indexes(j + 1) = B%col_indexes(j)
-                        j = j - 1
-                enddo
-                B%values(j + 1) = temp
-                B%col_indexes(j + 1) = temp_indx
-            enddo
-        enddo
-        !$omp end parallel do
+        !!$omp parallel do private(j, temp, temp_indx)
+        !do k = lower_bound, upper_bound
+        !    do i = B%row_starts(k) + 1, B%row_starts(k + 1) - 1
+        !        temp = B%values(i)
+        !        temp_indx = B%col_indexes(i)
+        !        j = i - 1
+        !        do while (j >= B%row_starts(k) )
+        !            if (B%col_indexes(j) <= temp_indx) exit
+        !                B%values(j + 1) = B%values(j)
+        !                B%col_indexes(j + 1) = B%col_indexes(j)
+        !                j = j - 1
+        !        enddo
+        !        B%values(j + 1) = temp
+        !        B%col_indexes(j + 1) = temp_indx
+        !    enddo
+        !enddo
+        !!$omp end parallel do
+
+        call Sort_CSR(B)
 
     end subroutine Generate_Coherent_Transport_Superoperator
 

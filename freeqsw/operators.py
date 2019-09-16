@@ -9,7 +9,7 @@ def check_indices(A):
 
 def graph(gamma, A):
     """Generate the graph Laplacian from an adjacency matrix.
-    
+
     :param gamma: Scaling factor, must satisty 0 <:math:`\gamma`.
     :type gamma: numpy.real64
 
@@ -31,7 +31,7 @@ def graph(gamma, A):
 
 def site_lindblads(G):
     """Generate a Lindblad operator matrix from a graph Laplacician.
-    
+
     :param A: Graph Laplacian.
     :type A: csr_matrix
 
@@ -54,7 +54,7 @@ def symmetrise(G):
     :type G: csr_matrix
 
     .. warning::
-        The matrix must be structurally symmetric in terms of its non-zero entires. 
+        The matrix must be structurally symmetric in terms of its non-zero entires.
     """
     check_indices(G)
 

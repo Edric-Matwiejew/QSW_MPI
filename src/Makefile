@@ -1,7 +1,7 @@
 #FC := mpifort -fopenmp -g -fcheck=array-temps,bounds,do,mem,pointer,recursion
 #FC := ftn -fopenmp -O2 -march=haswell -ffast-math -funroll-loops
-FC := mpifort -g -fbounds-check
-#FC := mpifort -O3 -ffast-math -funroll-loops -mtune=native
+#FC := mpifort -g -fbounds-check
+FC := mpifort -O3 -ffast-math -funroll-loops -mtune=native
 
 OBJDIR := obj
 

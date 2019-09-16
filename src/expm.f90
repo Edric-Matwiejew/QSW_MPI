@@ -741,7 +741,6 @@ module Expm
 
         endif
 
-        write(*,*) "HEHEHEHEHEHEEH"
         d = floor(real(q)/real(s))
         j = floor(real(q)/real(d))
         r = q - d*j
