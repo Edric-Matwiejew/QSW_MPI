@@ -43,8 +43,10 @@ def benchmark(fi, log):
         pops = qsw.measure.populations(rho = rhot)
 
     memory = memory_usage()[0]
+    M_nnz_local = test_system.M_values.shape[0]
 
     total_memory = comm.reduce(memory, MPI.SUM)
+    M_nnz_local = comm.reduce(M_nnz_local, MPI.SUM)
 
     if rank == 0:
         norm = np.sum(pops)
