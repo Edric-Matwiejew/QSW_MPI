@@ -34,7 +34,7 @@ def benchmark(fi, log):
     test_system.initial_state('even')
 
     step_start = time.time()
-    rhot = test_system.series(0, 10, 100, target = 0, precision = "dp")
+    rhot = test_system.series(0, 10, 1000, target = 0, precision = "dp")
     step_end = time.time()
 
     total_end = time.time()
