@@ -708,6 +708,8 @@ module Expm
                             target_precision = set_target_precision, &
                             mu = mu)
 
+        if (steps == 0) return
+
         q = steps
         h = (tq - t0)/real(q, dp)
 
@@ -733,7 +735,8 @@ module Expm
                                     MPI_communicator, &
                                     one_norm_series = one_norm_series, &
                                     p = p_in, &
-                                    target_precision = set_target_precision)
+                                    target_precision = set_target_precision, &
+                                    mu = mu)
 
             enddo
 

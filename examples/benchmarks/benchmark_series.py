@@ -33,14 +33,26 @@ def benchmark(fi, log):
 
     test_system.initial_state('even')
 
+    test_system.File('testset', action='w')
+
     step_start = time.time()
-    rhot = test_system.series(0, 10, 100, target = 0, precision = "dp")
+    #test_system.series(0, 1, 10, target = 0, precision = "dp", save = True, chunk_size = 3)
+    #test_system.series(0, 1, 10, target = 0, precision = "dp", save = True)
+    rhot = test_system.series(0, 10, 1000, target = 0, precision = "dp", save = True, chunk_size = 10)
+    rhot2 = test_system.series(0, 10, 1000, target = 0, precision = "dp", save = True, chunk_size = 10)
+    #print(rhot.shape)
     step_end = time.time()
 
     total_end = time.time()
 
     if rank == 0:
         pops = qsw.measure.populations(rho = rhot)
+        pops2 = qsw.measure.populations(rho = rhot2)
+        print('hi')
+        print(np.sum(pops,axis=1)-np.sum(pops2,axis=1))
+
+        for rho in rhot:
+            print(np.max(np.abs(rho)))
 
     memory = memory_usage()[0]
 
