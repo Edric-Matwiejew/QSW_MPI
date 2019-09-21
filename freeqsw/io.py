@@ -5,7 +5,7 @@ import h5py
 class File(object):
 
     def __init__(self, filename):
-        self.File = h5py.File(filename,"a")
+        self.File = h5py.File(filename + '.qsw',"a")
 
     def load_csr(self, group):
 
