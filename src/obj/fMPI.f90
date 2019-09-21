@@ -1087,6 +1087,9 @@ subroutine gather_series(   M_local_rows, &
 
     complex(8), dimension(:,:), allocatable :: rhot_v_series_gathered
 
+    ! MPI EXP
+    integer :: ierr, rank
+
 !f2py integer, optional,intent(in),check(shape(rhot_v_series,0)==m_local_rows),depend(rhot_v_series) :: m_local_rows=shape(rhot_v_series,0)
 !f2py integer, optional,intent(in),check((shape(rhot_v_series,1)-1)==steps),depend(rhot_v_series) :: steps=(shape(rhot_v_series,1)-1)
 !f2py complex(kind=8) dimension(m_local_rows,steps + 1),intent(in) :: rhot_v_series
@@ -1097,6 +1100,8 @@ subroutine gather_series(   M_local_rows, &
 !f2py integer intent(in) :: h_aug_rows
 !f2py complex(kind=8) dimension(h_aug_rows,h_aug_rows,steps + 1),intent(out),depend(h_aug_rows,h_aug_rows,steps) :: rhot_series
 
+    call mpi_comm_rank(mpi_communicator, rank, ierr)
+
     allocate(rhot_v_series_gathered(partition_table(1): &
         partition_table(size(partition_table)) - 1, steps + 1))
 
@@ -1106,6 +1111,9 @@ subroutine gather_series(   M_local_rows, &
                                 rhot_v_series_gathered, &
                                 MPI_communicator)
 
-    call Reshape_Vectorized_Operator_Series( rhot_v_series_gathered, rhot_series)
+
+    if (rank == root) then
+        call Reshape_Vectorized_Operator_Series( rhot_v_series_gathered, rhot_series)
+    endif
 
 end subroutine gather_series
