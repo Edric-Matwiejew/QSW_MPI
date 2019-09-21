@@ -8,10 +8,12 @@ import freeqsw as qsw
 import time
 from memory_profiler import memory_usage
 
-def benchmark(fi, log):
+def benchmark(fi, log, output):
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+
+    name = os.path.splitext(os.path.basename(fi))[0]
 
     if rank == 0:
         if os.path.exists(log):
@@ -33,14 +35,17 @@ def benchmark(fi, log):
 
     test_system.initial_state('even')
 
+    test_system.File(name, action='a')
+
     step_start = time.time()
-    rhot = test_system.series(0, 10, 1000, target = 0, precision = "dp")
+    test_system.series(0, 10, 1000, target = 0, precision = "dp", save = True, chunk_size = 100, name = output)
     step_end = time.time()
 
     total_end = time.time()
 
     if rank == 0:
-        pops = qsw.measure.populations(rho = rhot)
+        data = qsw.io.File(name)
+        pops = qsw.measure.populations(File = data, series_name = output)
 
     memory = memory_usage()[0]
 
@@ -60,4 +65,4 @@ def benchmark(fi, log):
 
         log.close()
 
-benchmark(sys.argv[1], sys.argv[2])
+benchmark(sys.argv[1], sys.argv[2], sys.argv[3])

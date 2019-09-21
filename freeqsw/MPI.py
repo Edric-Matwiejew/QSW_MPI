@@ -6,6 +6,7 @@ import freeqsw.operators as operators
 import freeqsw.fMPI as fMPI
 import freeqsw.io as io
 import time
+from warnings import warn
 
 def load_walk(
         omega,
@@ -209,11 +210,6 @@ class walk(object):
                 self.partition_table,
                 self.MPI_communicator.py2f())
 
-        #if self.flock > 1:
-        #    total_receives = np.sum(self.M_num_rec_inds)
-        #else:
-        #    total_receives = 1
-
         self.M_local_col_inds, self.M_rhs_send_inds = fMPI.rec_b(
                 self.M_rows,
                 np.sum(self.M_num_rec_inds),
@@ -230,21 +226,6 @@ class walk(object):
         self.reconcile_time = finish - start
 
         start = time.time()
-
-        #self.one_norms, self.p = fMPI.one_norm_series(
-        #        self.M_rows,
-        #        self.M_row_starts,
-        #        [],
-        #        [],
-        #        self.M_num_rec_inds,
-        #        self.M_rec_disps,
-        #        self.M_num_send_inds,
-        #        self.M_send_disps,
-        #        [],
-        #        self.M_rhs_send_inds,
-        #        self.partition_table,
-        #        self.MPI_communicator.py2f())
-
 
         self.one_norms, self.p = fMPI.one_norm_series(
                 self.M_rows,
@@ -408,6 +389,9 @@ class walk(object):
             At minimum a **target** must be specified, or **save** must be 'True'.
         """
 
+        if (target is None) and (save is False):
+            raise ValueError("target= None and save=False. No target specified for series result")
+
         if precision is None:
             precision = "dp"
 
@@ -466,7 +450,7 @@ class walk(object):
                                         self.size)
             return rhot
 
-    def series(self, t1, t2, steps, target = None, save = False, name = None, precision = None):
+    def series(self, t1, t2, steps, target = None, save = False, name = None, precision = None, chunk_size = None):
         """Calculate the state of the system over the time interval t1 to t2.
 
         :param t1: The starting time, must statisfy :math:`0 \ge t`.
@@ -496,65 +480,127 @@ class walk(object):
             At minimum a **target** must be specified, or **save** must be 'True'.
         """
 
+        if (target is None) and (save is False):
+            raise ValueError("target= None and save=False. No target specified for series result")
 
         if precision is None:
             precision = "dp"
 
-        rhot_v_series = fMPI.series( self.M_rows, \
-                                    self.M_row_starts, \
-                                    self.M_col_indexes, \
-                                    self.M_values, \
-                                    self.M_num_rec_inds, \
-                                    self.M_rec_disps, \
-                                    self.M_num_send_inds, \
-                                    self.M_send_disps, \
-                                    self.M_local_col_inds, \
-                                    self.M_rhs_send_inds, \
-                                    self.mu, \
-                                    t1, \
-                                    t2, \
-                                    self.rho_v, \
-                                    steps, \
-                                    self.partition_table, \
-                                    self.p, \
-                                    self.one_norms, \
-                                    self.MPI_communicator.py2f(), \
-                                    precision)
+        if (chunk_size is None) and (save is False):
+            chunk_size = steps
+        elif (chunk_size is None) and (save is True):
+            chunk_size = np.rint(float(40**9)/(16*self.H.shape[0]**2))
 
-        if save:
+        if (chunk_size is not None) and (save is False):
+            chunk_size = steps
+            if self.rank == 0:
+                warn('Chunked evaluation used only if save file is specified, defaulting to chunk_size=' + str(steps), UserWarning)
 
-            rhot_series = fMPI.gather_series(rhot_v_series, \
-                                            self.partition_table, \
-                                            0, \
-                                            self.MPI_communicator.py2f(), \
-                                            self.size)
+        chunks = int(np.ceil(steps/float(chunk_size)))
 
-            if self.rank is 0:
+        h = np.float32(t2 - t1)/np.float32(steps)
+        chunk_steps = chunk_size
 
-                output = h5py.File(self.filename + ".qsw", "a")
+        for i in range(0,chunks):
 
-                if name is None:
-                    name = 'series ' + str(output['series'].attrs['counter'])
-                    output['series'].attrs['counter'] += 1
+            t1_chunk = i*chunk_size*h + t1
 
-                series = output['series'].create_dataset(name, data = rhot_series.T, compression = "gzip")
-                series.attrs['omega'] = self.omega
-                series.attrs['t1'] = t1
-                series.attrs['t2'] = t2
-                series.attrs['steps'] = steps
-                series.attrs['initial state'] = self.initial_state_name
-                series.attrs['initial state gen'] = self.initial_state_gen
+            if i == (chunks - 1):
+                t2_chunk = t2
+                chunk_steps = int(np.rint((t2_chunk - t1_chunk)/h))
+            else:
+                t2_chunk = (i + 1)*chunk_size*h + t1
 
-                output.close()
+            rhot_v_series = fMPI.series(
+                    self.M_rows,
+                    self.M_row_starts,
+                    self.M_col_indexes,
+                    self.M_values,
+                    self.M_num_rec_inds,
+                    self.M_rec_disps,
+                    self.M_num_send_inds,
+                    self.M_send_disps,
+                    self.M_local_col_inds,
+                    self.M_rhs_send_inds,
+                    self.mu,
+                    t1_chunk,
+                    t2_chunk,
+                    self.rho_v,
+                    chunk_steps,
+                    self.partition_table,
+                    self.p,
+                    self.one_norms,
+                    self.MPI_communicator.py2f(),
+                    precision)
+
+            if save:
+
+                if self.rank == 0:
+                    output_size = self.size
+                else:
+                    output_size = 1
+
+                rhot_series = fMPI.gather_series(
+                        rhot_v_series,
+                        self.partition_table,
+                        0,
+                        self.MPI_communicator.py2f(),
+                        output_size)
+
+                if (self.rank == 0) and (i == 0):
+
+                    output = h5py.File(self.filename + ".qsw", "a")
+
+                    if name is None:
+                        name = 'series ' + str(output['series'].attrs['counter'])
+                        output['series'].attrs['counter'] += 1
+
+                    series = output['series'].create_dataset(
+                            name,
+                            data = rhot_series.T,
+                            maxshape = (steps + 1, self.H.shape[0], self.H.shape[0]),
+                            chunks = True,
+                            compression = "gzip")
+
+                    series.attrs['omega'] = self.omega
+                    series.attrs['t1'] = t1
+                    series.attrs['t2'] = t2
+                    series.attrs['steps'] = steps
+                    series.attrs['initial state'] = self.initial_state_name
+                    series.attrs['initial state gen'] = self.initial_state_gen
+                    output.close()
+
+                elif self.rank == 0:
+
+                    output = h5py.File(self.filename + ".qsw", "a")
+                    series = output['series'][name]
+                    series.resize(series.shape[0] + chunk_steps, axis = 0)
+                    series[-chunk_steps:,:,:] = rhot_series.T[1:]
+
+                    output.close()
 
         if target is not None:
 
             if (not save) or (target is not 0):
+
+                if self.rank == 0:
+                    output_size = self.size
+                else:
+                    output_size = 1
 
                 rhot_series = fMPI.gather_series(rhot_v_series, \
                                                 self.partition_table, \
                                                 target, \
                                                 self.MPI_communicator.py2f(), \
                                                 self.size)
+                return rhot_series.T
 
-            return rhot_series.T
+            else:
+
+                if self.rank == target:
+                    output = h5py.File(self.filename + ".qsw", "r")
+                    rhot_series = output['series'][name][:]
+                    output.close()
+
+                    return rhot_series
+
