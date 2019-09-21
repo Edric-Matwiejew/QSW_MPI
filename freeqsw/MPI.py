@@ -417,11 +417,16 @@ class walk(object):
 
         if save:
 
+            if self.rank == 0:
+                output_size = self.size
+            else:
+                output_size = 1
+
             rhot = fMPI.gather_step( rhot_v, \
                                     self.partition_table, \
                                     0, \
                                     self.MPI_communicator.py2f(), \
-                                    self.size)
+                                    output_size)
 
             if self.rank is 0:
 
@@ -443,11 +448,16 @@ class walk(object):
 
             if (not save) or (target is not 0):
 
+                if self.rank == 0:
+                    output_size = self.size
+                else:
+                    output_size = 1
+
                 rhot = fMPI.gather_step( rhot_v, \
                                         self.partition_table, \
                                         target, \
                                         self.MPI_communicator.py2f(), \
-                                        self.size)
+                                        output_size)
             return rhot
 
     def series(self, t1, t2, steps, target = None, save = False, name = None, precision = None, chunk_size = None):

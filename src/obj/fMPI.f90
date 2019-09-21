@@ -900,6 +900,10 @@ subroutine gather_step( M_local_rows, &
 
     complex(8), dimension(:), allocatable :: rhot_gathered
 
+    ! MPI ENVIRONMENT
+    integer :: rank
+    integer :: ierr
+
 !f2py integer, optional,intent(in),check(len(rhot_v)>=m_local_rows),depend(rhot_v) :: m_local_rows=len(rhot_v)
 !f2py complex(kind=8) dimension(m_local_rows),intent(in) :: rhot_v
 !f2py integer, optional,intent(in),check((len(partition_table)-1)>=flock),depend(partition_table) :: flock=(len(partition_table)-1)
@@ -909,16 +913,20 @@ subroutine gather_step( M_local_rows, &
 !f2py integer intent(in) :: h_aug_rows
 !f2py complex(kind=8) dimension(h_aug_rows,h_aug_rows),intent(out),depend(h_aug_rows,h_aug_rows) :: rhot
 
+    call mpi_comm_rank(mpi_communicator, rank, ierr)
+
     allocate(rhot_gathered(partition_table(1):partition_table(size(partition_table)) - 1))
 
 
-        call Gather_Dense_Vector(   rhot_v, &
-                                    partition_table, &
-                                    root, &
-                                    rhot_gathered, &
-                                    MPI_communicator)
+    call Gather_Dense_Vector(   rhot_v, &
+                                partition_table, &
+                                root, &
+                                rhot_gathered, &
+                                MPI_communicator)
 
+    if (rank == root) then
         call Reshape_Vectorized_Operator(rhot_gathered, rhot)
+    endif
 
 end subroutine gather_step
 
