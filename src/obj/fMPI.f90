@@ -373,7 +373,8 @@ subroutine  Super_Operator( omega, &
                                         M, &
                                         MPI_communicator)
 
-        call Norm_Reduction(M, mu, MPI_communicator)
+        !call Norm_Reduction(M, mu, MPI_communicator)
+        mu=0
 
         M_row_starts(1:size(M%row_starts)) = M%row_starts
         M_col_indexes(1:size(M%col_indexes)) = M%col_indexes
@@ -683,7 +684,7 @@ subroutine one_norm_series( M_rows, &
             alphas(i) = one_norm_array(i)**(1_dp/real(i,8))
 
             if (i >= 3) then
-                if((abs((alphas(i - 1) - alphas(i))/alphas(i)) < 0.5)) then
+                if((abs((alphas(i - 1) - alphas(i))/alphas(i))/alphas(i) < 0.05)) then
                     p = i - 1
                     exit
                 endif

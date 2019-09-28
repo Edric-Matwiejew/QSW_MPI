@@ -118,7 +118,7 @@ def load_system(filename, MPI_communicator):
     rank = MPI_communicator.Get_rank()
 
     if rank == 0:
-        system = File(str(filename) + '.qsw')
+        system = File(str(filename))
         H = system.H()
         L = system.L()
         sources = system.sources()
@@ -198,7 +198,7 @@ def set_file(
         else:
             output.attrs['# sources'] = 0
 
-    elif source_sites[0] != int(output.attrs['# sources']):
+    elif source_sites.shape[0] != int(output.attrs['# sources']):
             raise NameError('Stored source sites do not match with the current walk.')
 
     if 'sinks' not in output:
@@ -213,7 +213,7 @@ def set_file(
             output.attrs['# sinks'] = 0
 
 
-    elif source_sites[0] != int(output.attrs['# sinks']):
+    elif source_sites.shape[0] != int(output.attrs['# sinks']):
             raise NameError('Stored sink sites do not match with the current walk.')
 
     if 'initial states' not in output:

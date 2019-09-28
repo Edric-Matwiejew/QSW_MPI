@@ -20,7 +20,6 @@ def benchmark(fi, log):
             log = open(log, 'w')
             log.write('file, system size, M nnz, norm, construct t, reconcile t, one norms t, step t, total t, memory\n')
 
-
     total_start = time.time()
 
     G = sp.load_npz(fi)

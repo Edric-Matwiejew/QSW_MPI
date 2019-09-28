@@ -7,6 +7,7 @@ from mpi4py import MPI
 import networkx as nx
 import freeqsw as qsw
 import time
+from scipy.io import mmwrite
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()

@@ -4,9 +4,160 @@ import matplotlib.animation as animation
 import networkx as nx
 import freeqsw.io as io
 import freeqsw.measure as measure
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+import matplotlib.colors as colorz
+from matplotlib.ticker import MaxNLocator
+
+def population_lines(pops, t1, t2, labels = False):
+
+    fig = plt.figure()
+
+    steps = pops.shape[0]
+
+    h = (t2 - t1)/float(steps)
+
+    ts = np.arange(t1, t2, h)
+
+    for i in range(pops.shape[1]):
+        if labels:
+            plt.plot(ts, pops[:,i], label = str(i))
+        else:
+            plt.plot(ts, pops[:,i])
+
+    if labels:
+        plt.legend(title="Nodes")
+
+    plt.ylabel(r'population')
+    plt.xlabel('t')
+
+    return fig
+
+def coherence_lines(node_pairs, cohs, t1, t2, labels = False):
+
+    fig = plt.figure()
+
+    steps = cohs.shape[0]
+
+    h = (t2 - t1)/float(steps)
+
+    ts = np.arange(t1, t2, h)
+
+    for i in range(cohs.shape[1]):
+        if labels:
+            plt.plot(ts, cohs[:,i], label = str((node_pairs[0][i], node_pairs[1][i])))
+        else:
+            plt.plot(ts, cohs[:,i])
+
+    if labels:
+        plt.legend(title = "Node Pairs")
+
+    plt.ylabel(r'coherence')
+    plt.xlabel('t')
+
+    return fig
+
+def population_bars(pops, t1, t2, t_tick_freq = None, t_round = 2):
+
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+
+    steps = pops.shape[0]
+
+    x = np.arange(0,pops.shape[1],1)
+
+    h = (t2 - t1)/float(steps)
+    y = np.full(pops.shape[1],0)
+
+    it = iter(range(steps))
+    next(it,None)
+
+    for i in it:
+        x = np.vstack((x,np.arange(0,pops.shape[1],1)))
+        y = np.vstack((y, np.full(pops.shape[1], i)))
+
+    x = np.ndarray.flatten(x)
+    y = np.ndarray.flatten(y)
+
+
+    z = np.zeros(x.shape)
+
+    dx = np.full(x.shape, 0.2)
+    dy = np.full(x.shape, 0.2)
+    dz = np.ndarray.flatten(pops)
+
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    if t_tick_freq is not None:
+        plt.yticks([i for i in range(0,steps,t_tick_freq)], [str(round(t,t_round)) for t in np.arange(h,steps,t_tick_freq*h)])
+    else:
+        plt.yticks([i for i in range(0,steps)], [str(round(t,2)) for t in np.arange(h,steps,h)])
+
+    plt.ylim(steps + 1, 0)
+
+    ax.set_xlabel('Node')
+    ax.set_ylabel('t')
+    ax.set_zlabel(r'population')
+
+    fracs = dz.astype(float)/dz.max()
+    norm = colorz.Normalize(fracs.min(), fracs.max())
+    colors = cm.jet(norm(fracs))
+
+    ax.bar3d(x, y, z, dx, dy, dz, color=colors)
+
+    return fig
+
+def coherence_bars(node_pairs, cohs, t1, t2, t_tick_freq = None, t_round = 2):
+
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+
+    steps = cohs.shape[0]
+
+    x = np.arange(0,node_pairs[0].shape[0],1)
+    h = (t2 - t1)/float(steps)
+    y = np.full(cohs.shape[1],0)
+
+    it = iter(range(steps))
+    next(it,None)
+
+    for i in it:
+        x = np.vstack((x,np.arange(0,node_pairs[0].shape[0],1)))
+        y = np.vstack((y, np.full(cohs.shape[1], i)))
+
+    x = np.ndarray.flatten(x)
+    y = np.ndarray.flatten(y)
+
+    z = np.zeros(x.shape)
+
+    dx = np.full(x.shape, 0.2)
+    dy = np.full(x.shape, 0.2)
+    dz = np.ndarray.flatten(cohs)
+
+    plt.xticks(x, [str(node_pair) for node_pair in zip(node_pairs[0], node_pairs[1])])
+
+    if t_tick_freq is not None:
+        plt.yticks([i for i in range(0,steps,t_tick_freq)], [str(round(t,t_round)) for t in np.arange(h,steps,t_tick_freq*h)])
+    else:
+        plt.yticks([i for i in range(0,steps)], [str(round(t,2)) for t in np.arange(h,steps,h)])
+
+    plt.ylim(steps + 1, 0)
+
+    ax.set_xlabel('Node Pairs')
+    ax.set_ylabel('t')
+    ax.set_zlabel(r'coherence')
+
+    offset = dz + np.abs(dz.min())
+    fracs = offset.astype(float)/offset.max()
+    norm = colorz.Normalize(fracs.min(), fracs.max())
+    colors = cm.jet(norm(fracs))
+
+    ax.bar3d(x, y, z, dx, dy, dz, color=colors)
+
+    return fig
+
 
 def graph(  G,\
-            filename, \
             sources = None,\
             sinks = None, \
             title = None, \
@@ -86,9 +237,6 @@ def graph(  G,\
             graph_node_list.append(node)
 
     if layout is None:
-        #fixed_positions = {0:(0,0)}
-        #fixed_nodes = fixed_positions.keys()
-        #layout = nx.spring_layout(Gaug, iterations = 50, fixed = fixed_nodes, pos=fixed_positions)
         layout = nx.spring_layout(Gaug, iterations = 50)
 
     fig = plt.figure(figsize = (size[0], size[1]), dpi = 80)
@@ -127,9 +275,7 @@ def graph(  G,\
     elif (sources is not None) or (sinks is not None):
         create_legend()
 
-    plt.savefig(filename + '.' + format, format = format)
-    plt.clf()
-
+    return fig
 
 def animate(G,
             populations,

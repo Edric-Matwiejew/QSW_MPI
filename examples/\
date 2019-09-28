@@ -1,0 +1,60 @@
+import sys
+sys.path.append('../')
+# This example will simulate a QSW on a directed wheel graph, shown is Figure _.
+# We first must import mpi4py and FreeQSW, these are the minimum requirements to run a FreeQSW simulation.
+# Also used in this example are the modules networkx, numpy and matplotlib.
+from mpi4py import MPI
+import freeqsw as qsw
+import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# The next step is to step up the MPI enviroment. This involves creating an MPI communicator object and defining the process rank.
+
+mpi_comm = MPI.COMM_WORLD
+rank = mpi_comm.Get_rank()
+
+# A graph is then constructed at each node using the nx.wheel_graph(4), where 4 is the number of nodes. This is then convereted to a Scipy sparse CSR matrix.
+
+Graph = nx.wheel_graph(4)
+G = nx.to_scipy_sparse_matrix(Graph, dtype=np.complex128)
+
+# To create a directed graph we will assign random weights between [0, 1) to the edges of G. Note the use of np.random.seed(1), this ensures that each MPI process generates the same sequence of random numbers.
+
+np.random.seed(1)
+for i in range(G.count_nonzero()):
+    G.data[i] = G.data[i]*np.random.random()
+
+#From this  a directed graph laplacian is created with $\gamma = 1$. This is used to obtain the Lindblad matrix and then symmetrised as per Equation _  to obtain H.
+
+H = qsw.operators.graph(1.0, G)
+L = qsw.operators.site_lindblads(H)
+qsw.operators.symmetrise(H)
+
+# We then instantiate a walk object, on creation it constructs the distributed superoperator $\LL$ and determines its 1-norm series. Below $\omega = 0.1$.
+
+wheel_graph = qsw.MPI.walk(0.1, H, L, mpi_comm)
+
+#An inital state is passed to wheel_graph of $\rho(0) = |0><0|$.
+
+rho_0 = np.zeros(G.shape, dtype=np.complex128)
+rho_0[0,0] = 1
+wheel_graph.initial_state(rho_0)
+
+#A QSW
+rho_t = wheel_graph.step(5, target = 0)
+
+rho_t_series = wheel_graph.series(0, 10, 10, target=0)
+
+if rank == 0:
+
+    pop_step = qsw.measure.populations(rho=rho_t)
+    pop_series = qsw.measure.populations(rho=rho_t_series)
+
+    node_pairs, cohs = qsw.measure.coherences(rho=rho_t_series)
+
+    qsw.plot.population_bars(pop_series, 0, 10, t_tick_freq = 2, t_round = 1)
+
+    qsw.plot.coherence_bars(node_pairs, cohs, 0, 10, t_tick_freq = 2, t_round = 1)
+
+    plt.show()
