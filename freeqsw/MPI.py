@@ -31,10 +31,10 @@ def load_walk(
     """
     H, L, sources, sinks = io.load_system(filename, MPI_communicator)
 
-    walk = walk(omega, H, L, MPI_communicator, sources, sinks)
-    walk.file(filename, action = "a")
+    walk_out = walk(omega, H, L, MPI_communicator, sources, sinks)
+    walk_out.File(filename, action = "a")
 
-    return walk
+    return walk_out
 
 class walk(object):
     """The :class:`walk` object handels the creation of distributed superoperators, density matrices and system propagation in an MPI environment. It also enables the saving of results and input data to a .qsw file. This object and its contianing methods will only function correctly if called within an MPI instance, as shown in the examples.
@@ -568,7 +568,7 @@ class walk(object):
                     series = output['series'].create_dataset(
                             name,
                             data = rhot_series.T,
-                            maxshape = (steps + 1, self.H.shape[0], self.H.shape[0]),
+                            maxshape = (steps + 1, self.size[0], self.size[0]),
                             chunks = True,
                             compression = "gzip")
 
@@ -602,7 +602,7 @@ class walk(object):
                                                 self.partition_table, \
                                                 target, \
                                                 self.MPI_communicator.py2f(), \
-                                                self.size)
+                                                output_size)
                 return rhot_series.T
 
             else:

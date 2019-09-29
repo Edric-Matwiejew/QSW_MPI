@@ -320,7 +320,6 @@ module Operators
         enddo
         !$omp end parallel do
 
-
         allocate(B%row_starts(lower_bound:upper_bound + 1))
 
         !$omp parallel do
@@ -1410,6 +1409,13 @@ module Operators
                                             source_rates = source_rates, &
                                             sink_sites = sink_sites, &
                                             sink_rates = sink_rates)
+                write(*,*) source_sites, source_rates
+                write(*,*) sink_sites, sink_rates
+                write(*,*) L_aug%values
+                write(*,*) L_aug%col_indexes
+                write(*,*) L_aug%row_starts
+                write(*,*) L_aug%rows
+                write(*,*) L_aug%columns
 
                 call Generate_Scattering_Superoperator( L_aug, &
                                                         L_bound, &
