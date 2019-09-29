@@ -1,0 +1,2 @@
+file, system size, M nnz, norm_diff, construct t, reconcile t, one norms t, series t, total t, memory
+graphs/random_graphs/random_graph_1296.npz, 1296, 4191545, 7.66053886991e-15, 0.602938890457, 0.0747771263123, 7.10576891899, 43008.584245, 43016.4370542, 15820.765625
