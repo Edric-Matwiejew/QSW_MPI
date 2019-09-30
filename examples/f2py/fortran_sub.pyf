@@ -1,0 +1,26 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module fortran_sub ! in 
+    interface  ! in :fortran_sub
+        subroutine sub_2(a_size,b_size,a,b,d) ! in :fortran_sub:fortran_sub.f90
+            integer, optional,intent(in),check(len(a)>=a_size),depend(a) :: a_size=len(a)
+            integer, optional,intent(in),check(len(b)>=b_size),depend(b) :: b_size=len(b)
+            integer dimension(a_size),intent(in) :: a
+            integer dimension(b_size),intent(in) :: b
+            real intent(out) :: d
+        end subroutine sub_2
+        subroutine sub_3(a_size,b_size,c_size,a,b,c,d) ! in :fortran_sub:fortran_sub.f90
+            integer, optional,intent(in),check(len(a)>=a_size),depend(a) :: a_size=len(a)
+            integer, optional,intent(in),check(len(b)>=b_size),depend(b) :: b_size=len(b)
+            integer, optional,intent(in),check(len(c)>=c_size),depend(c) :: c_size=len(c)
+            integer dimension(a_size),intent(in) :: a
+            integer dimension(b_size),intent(in) :: b
+            real dimension(c_size),intent(in) :: c
+            real intent(out) :: d
+        end subroutine sub_3
+    end interface 
+end python module fortran_sub
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
