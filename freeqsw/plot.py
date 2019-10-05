@@ -9,9 +9,9 @@ from matplotlib import cm
 import matplotlib.colors as colorz
 from matplotlib.ticker import MaxNLocator
 
-def population_lines(pops, t1, t2, labels = False):
+def population_lines(pops, t1, t2, labels = False, figsize = (5,4)):
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=figsize)
 
     steps = pops.shape[0]
 
@@ -33,9 +33,9 @@ def population_lines(pops, t1, t2, labels = False):
 
     return fig
 
-def coherence_lines(node_pairs, cohs, t1, t2, labels = False):
+def coherence_lines(node_pairs, cohs, t1, t2, labels = False, figsize = (5,4)):
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=figsize)
 
     steps = cohs.shape[0]
 
@@ -57,9 +57,9 @@ def coherence_lines(node_pairs, cohs, t1, t2, labels = False):
 
     return fig
 
-def population_bars(pops, t1, t2, t_tick_freq = None, t_round = 2):
+def population_bars(pops, t1, t2, t_tick_freq = None, t_round = 2, figsize = (5,4)):
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=figsize)
     ax = fig.gca(projection='3d')
 
     steps = pops.shape[0]
@@ -107,9 +107,9 @@ def population_bars(pops, t1, t2, t_tick_freq = None, t_round = 2):
 
     return fig
 
-def coherence_bars(node_pairs, cohs, t1, t2, t_tick_freq = None, t_round = 2):
+def coherence_bars(node_pairs, cohs, t1, t2, t_tick_freq = None, t_round = 2, figsize = (5,4)):
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=figsize)
     ax = fig.gca(projection='3d')
 
     steps = cohs.shape[0]
@@ -134,7 +134,10 @@ def coherence_bars(node_pairs, cohs, t1, t2, t_tick_freq = None, t_round = 2):
     dy = np.full(x.shape, 0.2)
     dz = np.ndarray.flatten(cohs)
 
-    plt.xticks(x, [str(node_pair) for node_pair in zip(node_pairs[0], node_pairs[1])])
+    plt.xticks(x, [str(node_pair) for node_pair in zip(node_pairs[0], node_pairs[1])], rotation = 45, ha = 'right')
+
+    for tick in ax.xaxis.get_major_ticks():
+        tick.set_pad(-7.7)
 
     if t_tick_freq is not None:
         plt.yticks([i for i in range(0,steps,t_tick_freq)], [str(round(t,t_round)) for t in np.arange(h,steps,t_tick_freq*h)])

@@ -210,9 +210,12 @@ class walk(object):
                 self.partition_table,
                 self.MPI_communicator.py2f())
 
+        #if np.sum(self.M_num_rec_inds) == 0:
+        #    self.M_num_rec_inds = 1
+
         self.M_local_col_inds, self.M_rhs_send_inds = fMPI.rec_b(
                 self.M_rows,
-                np.sum(self.M_num_rec_inds),
+                np.sum(self.M_num_send_inds),
                 self.M_row_starts,
                 self.M_col_indexes,
                 self.M_num_rec_inds,
@@ -226,6 +229,16 @@ class walk(object):
         self.reconcile_time = finish - start
 
         start = time.time()
+
+        #print(self.M_rhs_send_inds)
+        #print(self.M_rhs_send_inds.shape)
+        #print(self.M_values)
+        #print(self.M_row_starts)
+        #print(self.M_col_indexes)
+        #print(self.M_num_send_inds)
+        #temp = self.M_num_send_inds
+        #self.M_num_send_inds = self.M_num_rec_inds
+        #self.M_num_rec_inds = temp
 
         self.one_norms, self.p = fMPI.one_norm_series(
                 self.M_rows,
@@ -308,12 +321,14 @@ class walk(object):
 
             if len(state.shape) is 2:
                 self.rho = np.concatenate((state, np.zeros((state.shape[0], self.pad))), axis = 1)
-                self.rho = np.concatenate((state, np.zeros((self.pad, state.shape[0]))), axis = 0)
+                self.rho = np.concatenate((self.rho, np.zeros((self.pad, self.rho.shape[1]))), axis = 0)
                 self.initial_state_gen = 'User'
 
             elif len(state.shape) is 1:
                 self.rho = np.diag(np.concatenate((state, np.zeros((self.pad,))), axis = 0))
                 self.initial_state_gen = 'User'
+
+        print(self.rho.shape)
 
         self.rho_v = fMPI.initial_state(
                 self.M_local_rows,

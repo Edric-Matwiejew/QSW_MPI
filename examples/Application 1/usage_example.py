@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../')
+sys.path.append('../FreeQSW')
 # This example will simulate a QSW on a directed wheel graph, shown is Figure _.
 # We first must import mpi4py and FreeQSW, these are the minimum requirements to run a FreeQSW simulation.
 # Also used in this example are the modules networkx, numpy and matplotlib.

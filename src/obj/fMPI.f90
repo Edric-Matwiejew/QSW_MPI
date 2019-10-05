@@ -683,12 +683,12 @@ subroutine one_norm_series( M_rows, &
 
             alphas(i) = one_norm_array(i)**(1_dp/real(i,8))
 
-            if (i >= 3) then
-                if((abs((alphas(i - 1) - alphas(i))/alphas(i))/alphas(i) < 0.05)) then
-                    p = i - 1
-                    exit
-                endif
-            endif
+            !if (i >= 3) then
+            !    if((abs((alphas(i - 1) - alphas(i))/alphas(i))/alphas(i) < 0.05)) then
+            !        p = i - 1
+            !        exit
+            !    endif
+            !endif
 
         enddo
 

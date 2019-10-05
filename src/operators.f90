@@ -893,7 +893,7 @@ module Operators
                     L_aug%values(size(L%col_indexes) + n_sources + n_sinks))
 
         L_aug%rows = L%rows + n_sinks + n_sources
-        L_aug%columns = L_aug%rows
+        L_aug%columns = L_aug%rows + n_sinks + n_sources
 
         !$omp parallel do
         do i = 1, L%rows + 1
@@ -974,11 +974,13 @@ module Operators
 
     end subroutine Add_Sources_and_Sinks
 
+    ! NOTE: The sink and site variables are mixed up in this subroutine.
+    ! as a quick fix I have swappwed them as input arguments.
     subroutine Transport_Lindblads( N, &
-                                    source_sites, &
-                                    source_rates, &
                                     sink_sites, &
                                     sink_rates, &
+                                    source_sites, &
+                                    source_rates, &
                                     L_inout)
 
         integer, intent(in) :: N
@@ -1409,13 +1411,6 @@ module Operators
                                             source_rates = source_rates, &
                                             sink_sites = sink_sites, &
                                             sink_rates = sink_rates)
-                write(*,*) source_sites, source_rates
-                write(*,*) sink_sites, sink_rates
-                write(*,*) L_aug%values
-                write(*,*) L_aug%col_indexes
-                write(*,*) L_aug%row_starts
-                write(*,*) L_aug%rows
-                write(*,*) L_aug%columns
 
                 call Generate_Scattering_Superoperator( L_aug, &
                                                         L_bound, &
