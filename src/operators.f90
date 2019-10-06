@@ -1003,11 +1003,13 @@ module Operators
         L_inout%rows = N + augs
         L_inout%columns = N + augs
 
-        ! ARRAY CINSTRUCTOR
+        ! ARRAY CONSTRUCTOR
         L_inout%col_indexes(1:size(sink_sites)) = [(i + N, i = 1, size(sink_sites))]
-        L_inout%values(1:size(sink_sites)) = sink_rates
+        L_inout%values(1:size(sink_sites)) = sqrt(abs(sink_rates))
         L_inout%col_indexes(size(sink_sites) + 1: augs) = source_sites
-        L_inout%values(size(sink_sites) + 1: augs) = source_rates
+        L_inout%values(size(sink_sites) + 1: augs) = sqrt(abs(source_rates))
+
+        write(*,*) "HELLO"
 
         !$omp parallel do
         do i = 2, L_inout%rows + 1
