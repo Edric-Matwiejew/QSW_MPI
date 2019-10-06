@@ -9,21 +9,31 @@ from matplotlib import cm
 import matplotlib.colors as colorz
 from matplotlib.ticker import MaxNLocator
 
-def population_lines(pops, t1, t2, labels = False, figsize = (5,4)):
+def population_lines(pops, qsw_times, plot_times = [None, None], labels = False, figsize = (5,4)):
 
     fig = plt.figure(figsize=figsize)
 
     steps = pops.shape[0]
 
-    h = (t2 - t1)/float(steps)
+    h = (qsw_times[1] - qsw_times[0])/float(steps)
 
-    ts = np.arange(t1, t2, h)
+    if plot_times[0] is None:
+        plot_times[0] = qsw_times[0]
+    if plot_times[1] is None:
+        plot_times[1] = qsw_times[1]
+
+    plot_step_min = int((plot_times[0] - qsw_times[0])/h)
+    plot_step_max = int((plot_times[1] - qsw_times[0])/h - 1)
+
+    print(plot_step_min, plot_step_max)
+
+    ts = np.arange(qsw_times[0] + plot_step_min*h, qsw_times[0] + plot_step_max*h, h)
 
     for i in range(pops.shape[1]):
         if labels:
-            plt.plot(ts, pops[:,i], label = str(i))
+            plt.plot(ts, pops[plot_step_min:plot_step_max,i], label = str(i))
         else:
-            plt.plot(ts, pops[:,i])
+            plt.plot(ts, pops[plot_step_min:plot_step_max,i])
 
     if labels:
         plt.legend(title="Nodes")
@@ -33,21 +43,32 @@ def population_lines(pops, t1, t2, labels = False, figsize = (5,4)):
 
     return fig
 
-def coherence_lines(node_pairs, cohs, t1, t2, labels = False, figsize = (5,4)):
+def coherence_lines(node_pairs, cohs, qsw_times, plot_times = [None, None], labels = False, figsize = (5,4)):
 
     fig = plt.figure(figsize=figsize)
 
     steps = cohs.shape[0]
 
-    h = (t2 - t1)/float(steps)
+    h = (qsw_times[1] - qsw_times[0])/float(steps)
 
-    ts = np.arange(t1, t2, h)
+    if plot_times[0] is None:
+        plot_times[0] = qsw_times[0]
+    if plot_times[1] is None:
+        plot_times[1] = qsw_times[1]
+
+    plot_step_min = int((plot_times[0] - qsw_times[0])/h)
+    plot_step_max = int((plot_times[1] - qsw_times[0])/h - 1)
+
+    print(plot_step_min, plot_step_max)
+
+    ts = np.arange(qsw_times[0] + plot_step_min*h, qsw_times[0] + plot_step_max*h, h)
+
 
     for i in range(cohs.shape[1]):
         if labels:
-            plt.plot(ts, cohs[:,i], label = str((node_pairs[0][i], node_pairs[1][i])))
+            plt.plot(ts, cohs[plot_step_min:plot_step_max,i], label = str((node_pairs[0][i], node_pairs[1][i])))
         else:
-            plt.plot(ts, cohs[:,i])
+            plt.plot(ts, cohs[plot_step_min:plot_step_max,i])
 
     if labels:
         plt.legend(title = "Node Pairs")
