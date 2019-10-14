@@ -47,7 +47,7 @@ class File(object):
     def step(self, name):
         return np.array(self.File['steps'][str(name)], dtype = np.complex128)
 
-    def series(self, name, spacing = 15):
+    def series(self, name):
         return np.array(self.File['series'][str(name)], dtype = np.complex128)
 
     def list_steps(self, spacing = 15):
