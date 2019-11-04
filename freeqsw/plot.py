@@ -27,7 +27,7 @@ def population_lines(pops, qsw_times, plot_times = [None, None], labels = False,
 
     print(plot_step_min, plot_step_max)
 
-    ts = np.arange(qsw_times[0] + plot_step_min*h, qsw_times[0] + plot_step_max*h, h)
+    ts = np.arange(qsw_times[0] + plot_step_min*h, qsw_times[0] + (plot_step_max)*h, h)
 
     for i in range(pops.shape[1]):
         if labels:
@@ -36,10 +36,10 @@ def population_lines(pops, qsw_times, plot_times = [None, None], labels = False,
             plt.plot(ts, pops[plot_step_min:plot_step_max,i])
 
     if labels:
-        plt.legend(title="Nodes")
-
-    plt.ylabel(r'population')
-    plt.xlabel('t')
+        plt.legend(title="vertex")
+    plt.xticks([0,4,8,12,16,20])
+    plt.ylabel(r'population',fontsize = 14)
+    plt.xlabel('t',fontsize = 14)
 
     return fig
 
@@ -71,10 +71,10 @@ def coherence_lines(node_pairs, cohs, qsw_times, plot_times = [None, None], labe
             plt.plot(ts, cohs[plot_step_min:plot_step_max,i])
 
     if labels:
-        plt.legend(title = "Node Pairs")
-
-    plt.ylabel(r'coherence')
-    plt.xlabel('t')
+        plt.legend(title = "vertex pairs")
+    plt.xticks([0,4,8,12,16,20])
+    plt.ylabel(r'coherence',fontsize = 14)
+    plt.xlabel('t',fontsize = 14)
 
     return fig
 
@@ -84,6 +84,8 @@ def population_bars(pops, t1, t2, t_tick_freq = None, t_round = 2, figsize = (5,
     ax = fig.gca(projection='3d')
 
     steps = pops.shape[0]
+
+    pops = np.flip(pops)
 
     x = np.arange(0,pops.shape[1],1)
 
@@ -113,13 +115,12 @@ def population_bars(pops, t1, t2, t_tick_freq = None, t_round = 2, figsize = (5,
         plt.yticks([i for i in range(0,steps,t_tick_freq)], [str(round(t,t_round)) for t in np.arange(h,steps,t_tick_freq*h)])
     else:
         plt.yticks([i for i in range(0,steps)], [str(round(t,2)) for t in np.arange(h,steps,h)])
-
-    plt.ylim(steps + 1, 0)
-
-    ax.set_xlabel('Node')
+    plt.yticks([0,40,80,120,160,200],[20,16,12,8,4,0])
+    plt.ylim(0,steps + 1)
+    plt.xticks([0,1,2,3,4,5],[5,4,3,2,1,0])
+    ax.set_xlabel('vertex',fontsize = 14)
     ax.set_ylabel('t')
-    ax.set_zlabel(r'population')
-
+    ax.set_zlabel(r'population',fontsize = 14)
     fracs = dz.astype(float)/dz.max()
     norm = colorz.Normalize(fracs.min(), fracs.max())
     colors = cm.jet(norm(fracs))
@@ -164,12 +165,12 @@ def coherence_bars(node_pairs, cohs, t1, t2, t_tick_freq = None, t_round = 2, fi
         plt.yticks([i for i in range(0,steps,t_tick_freq)], [str(round(t,t_round)) for t in np.arange(h,steps,t_tick_freq*h)])
     else:
         plt.yticks([i for i in range(0,steps)], [str(round(t,2)) for t in np.arange(h,steps,h)])
-
+    plt.yticks([0,40,80,120,160,200],[0,4,8,12,16,20])
     plt.ylim(steps + 1, 0)
 
-    ax.set_xlabel('Node Pairs')
+    ax.set_xlabel('vertex pairs',fontsize = 13)
     ax.set_ylabel('t')
-    ax.set_zlabel(r'coherence')
+    ax.set_zlabel(r'coherence',fontsize = 14)
 
     offset = dz + np.abs(dz.min())
     fracs = offset.astype(float)/offset.max()
