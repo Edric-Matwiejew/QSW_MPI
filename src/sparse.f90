@@ -748,8 +748,8 @@ module Sparse
         integer, dimension(:), allocatable :: column_indexes_in
         complex(dp), dimension(:), allocatable :: values
 
-        integer :: col_ind_temp, row_ind_temp
-        complex(dp) :: val_temp
+        !integer :: col_ind_temp, row_ind_temp
+        !complex(dp) :: val_temp
 
         integer, dimension(:), allocatable :: send_counts, rec_counts
         integer, dimension(:), allocatable :: send_disps, rec_disps
@@ -763,17 +763,17 @@ module Sparse
 
         integer, dimension(:), allocatable :: target_rank
 
-        integer :: i, j, k
-        integer :: indx
+        integer :: i, j!, k
+        !integer :: indx
 
-        integer, dimension(:), allocatable :: row_start
+        !integer, dimension(:), allocatable :: row_start
 
-        real(dp) :: start, finish
+        !real(dp) :: start, finish
 
         !MPI_Environment
         integer :: rank
         integer :: flock
-        integer, dimension(MPI_status_size) :: status
+        !integer, dimension(MPI_status_size) :: status
         integer :: ierr
 
         call MPI_comm_size(MPI_communicator, flock, ierr)
@@ -990,7 +990,7 @@ module Sparse
 
         integer :: i, j
 
-        real(dp) :: start, finish
+        !real(dp) :: start, finish
 
         !MPI ENVIRONMENT
         integer :: rank
@@ -1170,7 +1170,7 @@ module Sparse
 
         integer :: i, j, k, l
 
-        real(dp) :: start, finish, calc_time
+        !real(dp) :: start, finish, calc_time
 
         ! MPI environment
         integer :: ierr
@@ -1193,7 +1193,7 @@ module Sparse
         allocate(rec_values(num_rec))
         allocate(send_values(num_send))
 
-        calc_time = 0
+        !calc_time = 0
 
         do l = 1, n
 
@@ -1231,7 +1231,7 @@ module Sparse
             enddo
             !$omp end parallel do
 
-            calc_time = calc_time + finish - start
+            !calc_time = calc_time + finish - start
 
             if (l < n) then
                 B_resize(lb:ub,:) = C_local
@@ -1468,7 +1468,7 @@ module Sparse
 
         integer :: lb, ub, lb_elements, ub_elements
 
-        integer :: total_rec_inds
+        !integer :: total_rec_inds
         integer, dimension(:), allocatable :: RHS_rec_inds
         integer :: node
 
@@ -1476,7 +1476,7 @@ module Sparse
 
         integer :: i, j
 
-        real(dp) :: start, finish
+        !real(dp) :: start, finish
 
         !MPI ENVIRONMENT
         integer :: rank

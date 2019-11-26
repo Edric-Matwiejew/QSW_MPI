@@ -20,3 +20,6 @@ __pycache__
 *.jpg
 *.jpeg
 junk
+build/*
+*egg-info
+dist/*

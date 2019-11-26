@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 
-project = 'FreeQSW'
+project = 'QSW_MPI'
 copyright = '2019, Edric Matwiejew'
 author = 'Edric Matwiejew'
 

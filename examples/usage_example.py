@@ -1,10 +1,8 @@
-import sys
-sys.path.append('../')
 # This example will simulate a QSW on a directed wheel graph, shown is Figure _.
 # We first must import mpi4py and FreeQSW, these are the minimum requirements to run a FreeQSW simulation.
 # Also used in this example are the modules networkx, numpy and matplotlib.
 from mpi4py import MPI
-import freeqsw as qsw
+import qsw_mpi as qsw
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -84,11 +82,11 @@ if rank == 0:
     node_pairs, cohs = qsw.measure.coherences(rho=rho_t_series)
 
 # These results can be visualised using the FreeQSW plot sub-module.
-    
-    qsw.plot.population_lines(pop_series, t1, t2, labels = True)
-    plt.savefig("population_lines.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
-    qsw.plot.coherence_lines(node_pairs, cohs, t1, t2, labels = True)
-    plt.savefig("coherence_lines.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
+
+    #qsw.plot.population_lines(pop_series, [t1, t2], labels = True)
+    #plt.savefig("population_lines.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
+    #qsw.plot.coherence_lines(node_pairs, cohs, [t1, t2], labels = True)
+    #plt.savefig("coherence_lines.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
 
 # Which are shown in Figures _ to _.
 
@@ -109,8 +107,8 @@ sinks = (np.array([3]), np.array([0.8]))
 
 # The sesulting graph can be visualized using the plot submodule:
 
-qsw.plot.graph(Graph, sources = sources, sinks = sinks, size = (4.5, 3.5), graph_color='orange', source_color='green', sink_color='red')
-plt.savefig("augmented_wheel_graph.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
+#qsw.plot.graph(Graph, sources = sources, sinks = sinks, size = (4.5, 3.5), graph_color='orange', source_color='green', sink_color='red')
+#plt.savefig("augmented_wheel_graph.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
 
 # By Equation _,  these additions result in a structrual change to H and L, it is therefore nessecary to intianstite  a new walk object.
 
@@ -136,14 +134,14 @@ if rank == 0:
     pop_series = qsw.measure.populations(rho=rhot)
     node_pairs, cohs = qsw.measure.coherences(rho=rho_t_series)
 
-    qsw.plot.population_bars(   pop_series, t1, t2, \
-                                t_tick_freq = 10, \
-                                t_round = 1)
-    plt.savefig("population_bars.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
-    plt.figure(figsize=(1,1))
-    qsw.plot.coherence_bars(node_pairs, cohs, t1, t2, \
-                            t_tick_freq = 10, t_round = 1)
-    plt.savefig("coherence_bars.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
+    #qsw.plot.population_bars(   pop_series, [t1, t2], \
+    #                            t_tick_freq = 10, \
+    #                            t_round = 1)
+    #plt.savefig("population_bars.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
+    #plt.figure(figsize=(1,1))
+    #qsw.plot.coherence_bars(node_pairs, cohs, [t1, t2], \
+    #                        t_tick_freq = 10, t_round = 1)
+    #plt.savefig("coherence_bars.jpeg", bbox_inches = 'tight', pad_inches = 0.2, dpi=300)
 
 # At a later time, if we wish to conduct further simulations with the same system, it may be initialized using 'useage_example.qsw', which contains all of the arrays nessecary to reconstruct the same super-operator.
 

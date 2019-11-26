@@ -13,7 +13,7 @@ module Expm
 
     private
 
-    public :: Expm_Multiply, Expm_Multiply_Series, Norm_Reduction
+    public :: Expm_Multiply, Expm_Multiply_Series
 
     integer, parameter :: RHV = 2, m_max = 55, p_max = 8
 
@@ -97,55 +97,6 @@ module Expm
         Infinity_Norm = inf_reduce
 
     end function Infinity_Norm
-
-    subroutine Norm_Reduction(A, mu, MPI_communicator)
-
-        type(CSR), intent(inout) :: A
-        complex(dp), intent(out) :: mu
-        integer, intent(in) :: MPI_communicator
-
-        integer, dimension(:), allocatable :: diag_inds
-        integer :: n_diag
-
-        complex(dp) :: trace_local
-
-        integer :: i, j
-
-        !MPI ENVIRONMENT
-        integer :: ierr
-
-        allocate(diag_inds(size(A%row_starts)))
-
-        trace_local = 0
-        n_diag = 0
-
-        do i = lbound(A%row_starts,1), ubound(A%row_starts,1) - 1
-            do j = A%row_starts(i), A%row_starts(i + 1) - 1
-                if (A%col_indexes(j) > i) then
-                    exit
-                elseif  (A%col_indexes(j) == i) then
-                    trace_local = trace_local + A%values(j)
-                    n_diag = n_diag + 1
-                    diag_inds(n_diag) = j
-                endif
-            enddo
-        enddo
-
-        call MPI_allreduce( trace_local, &
-                            mu, &
-                            1, &
-                            MPI_double_complex, &
-                            MPI_sum, &
-                            MPI_communicator, &
-                            ierr)
-
-        mu = mu/real(A%columns,dp)
-
-        do i = 1, n_diag
-            A%values(diag_inds(i)) = A%values(diag_inds(i)) - mu
-        enddo
-
-    end subroutine Norm_Reduction
 
     subroutine C_m( A, &
                     t, &
@@ -430,8 +381,7 @@ module Expm
                                 mpi_communicator, &
                                 one_norm_series, &
                                 p, &
-                                target_precision, &
-                                mu)
+                                target_precision)
 
         type(CSR), intent(inout) :: A
         complex(dp), intent(in), dimension(:) :: B
@@ -442,7 +392,6 @@ module Expm
         real(dp), dimension(p_max + 1), optional, intent(inout) :: one_norm_series
         integer, optional, intent(inout) :: p
         character(len=2), optional, intent(in) :: target_precision
-        complex(dp), optional, intent(inout) :: mu
 
         complex(dp), dimension(:), allocatable :: B_temp_1, B_temp_2
 
@@ -474,10 +423,6 @@ module Expm
         else
             set_target_precision = "dp"
             tol = tol_dp
-        endif
-
-        if (.not. present(mu)) then
-            mu = 0
         endif
 
         lb = lbound(C,1)
@@ -594,7 +539,6 @@ module Expm
 
             !$omp parallel do
             do k = lb, ub
-                C(k) = exp(t*mu/real(s,dp))*C(k)
                 B_temp_1(k) = C(k)
             enddo
             !$omp end parallel do
@@ -626,8 +570,7 @@ module Expm
                                         mpi_communicator, &
                                         one_norm_series_in, &
                                         p_ex, &
-                                        target_precision, &
-                                        mu)
+                                        target_precision)
 
         real(dp), intent(in) :: t0, tq
         type(CSR), intent(inout) :: A
@@ -639,7 +582,6 @@ module Expm
         real(dp), dimension(p_max + 1), optional, intent(inout) :: one_norm_series_in
         integer, optional, intent(inout) :: p_ex
         character(len=2), optional, intent(in) :: target_precision
-        complex(dp), optional, intent(inout) :: mu
 
         real(dp), dimension(p_max + 1) :: one_norm_series
         integer :: p_in
@@ -680,10 +622,6 @@ module Expm
             tol = tol_dp
         endif
 
-        if (.not. present(mu)) then
-            mu = 0
-        endif
-
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
 
@@ -705,8 +643,7 @@ module Expm
                             mpi_communicator, &
                             one_norm_series = one_norm_series, &
                             p = p_in, &
-                            target_precision = set_target_precision, &
-                            mu = mu)
+                            target_precision = set_target_precision)
 
         if (steps == 0) return
 
@@ -735,8 +672,7 @@ module Expm
                                     MPI_communicator, &
                                     one_norm_series = one_norm_series, &
                                     p = p_in, &
-                                    target_precision = set_target_precision, &
-                                    mu = mu)
+                                    target_precision = set_target_precision)
 
             enddo
 
@@ -844,7 +780,7 @@ module Expm
 
                 !$omp parallel do
                 do ii = 1, size(Z)
-                    X(ii, kay + (i - 1)*d + 1) =  exp(h*mu*real(kay,dp))*F(ii)
+                    X(ii, kay + (i - 1)*d + 1) =  F(ii)
                 enddo
                 !$omp end parallel do
 

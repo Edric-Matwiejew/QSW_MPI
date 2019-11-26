@@ -1,0 +1,200 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module fMPI ! in 
+    interface  ! in :fMPI
+        subroutine super_operator_extent(omega,h_rows,h_nnz,h_row_starts,h_col_indexes,h_values,l_nnz,l_row_starts,l_col_indexes,l_values,n_sources,source_sites,source_rates,n_sinks,sink_sites,sink_rates,flock,mpi_communicator,m_nnz_out,m_rows,partition_table) ! in :fMPI:fMPI.f90
+            real(kind=8) intent(in) :: omega
+            integer, optional,intent(in),check((len(h_row_starts)-1)>=h_rows),depend(h_row_starts) :: h_rows=(len(h_row_starts)-1)
+            integer, optional,intent(in),check(len(h_col_indexes)>=h_nnz),depend(h_col_indexes) :: h_nnz=len(h_col_indexes)
+            integer dimension(h_rows + 1),intent(in) :: h_row_starts
+            integer dimension(h_nnz),intent(in) :: h_col_indexes
+            complex(kind=8) dimension(h_nnz),intent(in),depend(h_nnz) :: h_values
+            integer, optional,intent(in),check(len(l_col_indexes)>=l_nnz),depend(l_col_indexes) :: l_nnz=len(l_col_indexes)
+            integer dimension(h_rows + 1),intent(in),depend(h_rows) :: l_row_starts
+            integer dimension(l_nnz),intent(in) :: l_col_indexes
+            complex(kind=8) dimension(l_nnz),intent(in),depend(l_nnz) :: l_values
+            integer, optional,intent(in),check(len(source_sites)>=n_sources),depend(source_sites) :: n_sources=len(source_sites)
+            integer dimension(n_sources),intent(in) :: source_sites
+            real(kind=8), target,dimension(n_sources),intent(in),depend(n_sources) :: source_rates
+            integer, optional,intent(in),check(len(sink_sites)>=n_sinks),depend(sink_sites) :: n_sinks=len(sink_sites)
+            integer dimension(n_sinks),intent(in) :: sink_sites
+            real(kind=8), target,dimension(n_sinks),intent(in),depend(n_sinks) :: sink_rates
+            integer intent(in) :: flock
+            integer intent(in) :: mpi_communicator
+            integer intent(out) :: m_nnz_out
+            integer intent(out) :: m_rows
+            integer dimension(flock + 1),intent(out),depend(flock) :: partition_table
+        end subroutine super_operator_extent
+        subroutine super_operator(omega,h_rows,h_nnz,h_row_starts,h_col_indexes,h_values,l_nnz,l_row_starts,l_col_indexes,l_values,n_sources,source_sites,source_rates,n_sinks,sink_sites,sink_rates,m_nnz_in,m_n_row_starts,flock,mpi_communicator,m_row_starts,m_col_indexes,m_values) ! in :fMPI:fMPI.f90
+            real(kind=8) intent(in) :: omega
+            integer, optional,intent(in),check((len(h_row_starts)-1)>=h_rows),depend(h_row_starts) :: h_rows=(len(h_row_starts)-1)
+            integer, optional,intent(in),check(len(h_col_indexes)>=h_nnz),depend(h_col_indexes) :: h_nnz=len(h_col_indexes)
+            integer dimension(h_rows + 1),intent(in) :: h_row_starts
+            integer dimension(h_nnz),intent(in) :: h_col_indexes
+            complex(kind=8) dimension(h_nnz),intent(in),depend(h_nnz) :: h_values
+            integer, optional,intent(in),check(len(l_col_indexes)>=l_nnz),depend(l_col_indexes) :: l_nnz=len(l_col_indexes)
+            integer dimension(h_rows + 1),intent(in),depend(h_rows) :: l_row_starts
+            integer dimension(l_nnz),intent(in) :: l_col_indexes
+            complex(kind=8) dimension(l_nnz),intent(in),depend(l_nnz) :: l_values
+            integer, optional,intent(in),check(len(source_sites)>=n_sources),depend(source_sites) :: n_sources=len(source_sites)
+            integer dimension(n_sources),intent(in) :: source_sites
+            real(kind=8), target,dimension(n_sources),intent(in),depend(n_sources) :: source_rates
+            integer, optional,intent(in),check(len(sink_sites)>=n_sinks),depend(sink_sites) :: n_sinks=len(sink_sites)
+            integer dimension(n_sinks),intent(in) :: sink_sites
+            real(kind=8), target,dimension(n_sinks),intent(in),depend(n_sinks) :: sink_rates
+            integer intent(in) :: m_nnz_in
+            integer intent(in) :: m_n_row_starts
+            integer intent(in) :: flock
+            integer intent(in) :: mpi_communicator
+            integer dimension(m_n_row_starts),intent(out),depend(m_n_row_starts) :: m_row_starts
+            integer dimension(m_nnz_in),intent(out),depend(m_nnz_in) :: m_col_indexes
+            complex(kind=8) dimension(m_nnz_in),intent(out),depend(m_nnz_in) :: m_values
+        end subroutine super_operator
+        subroutine rec_a(m_rows,m_n_row_starts,m_n_col_indexes,m_row_starts,m_col_indexes,flock,partition_table,mpi_communicator,m_num_rec_inds,m_rec_disps,m_num_send_inds,m_send_disps) ! in :fMPI:fMPI.f90
+            integer intent(in) :: m_rows
+            integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
+            integer, optional,intent(in),check(len(m_col_indexes)>=m_n_col_indexes),depend(m_col_indexes) :: m_n_col_indexes=len(m_col_indexes)
+            integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+            integer, target,dimension(m_n_col_indexes),intent(in) :: m_col_indexes
+            integer, optional,intent(in),check((len(partition_table)-1)>=flock),depend(partition_table) :: flock=(len(partition_table)-1)
+            integer dimension(flock + 1),intent(in) :: partition_table
+            integer intent(in) :: mpi_communicator
+            integer, target,dimension(flock),intent(out),depend(flock) :: m_num_rec_inds
+            integer, target,dimension(flock),intent(out),depend(flock) :: m_rec_disps
+            integer, target,dimension(flock),intent(out),depend(flock) :: m_num_send_inds
+            integer, target,dimension(flock),intent(out),depend(flock) :: m_send_disps
+        end subroutine rec_a
+        subroutine rec_b(m_rows,m_nnz,m_n_row_starts,num_send,m_row_starts,m_col_indexes,m_num_rec_inds,m_rec_disps,m_num_send_inds,m_send_disps,flock,partition_table,mpi_communicator,m_local_col_inds,m_rhs_send_inds) ! in :fMPI:fMPI.f90
+            integer intent(in) :: m_rows
+            integer, optional,intent(in),check(len(m_col_indexes)>=m_nnz),depend(m_col_indexes) :: m_nnz=len(m_col_indexes)
+            integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
+            integer intent(in) :: num_send
+            integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+            integer, target,dimension(m_nnz),intent(in) :: m_col_indexes
+            integer, target,dimension(flock),intent(in) :: m_num_rec_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_rec_disps
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_num_send_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_send_disps
+            integer, optional,intent(in),check(len(m_num_rec_inds)>=flock),depend(m_num_rec_inds) :: flock=len(m_num_rec_inds)
+            integer dimension(flock + 1),intent(in),depend(flock) :: partition_table
+            integer intent(in) :: mpi_communicator
+            integer, target,dimension(m_nnz),intent(out),depend(m_nnz) :: m_local_col_inds
+            integer, target,dimension(num_send),intent(out),depend(num_send) :: m_rhs_send_inds
+        end subroutine rec_b
+        subroutine one_norm_series(m_rows,m_n_col_indexes,m_n_values,m_n_local_col_indexes,m_n_row_starts,m_sends,m_row_starts,m_col_indexes,m_values,m_num_rec_inds,m_rec_disps,m_num_send_inds,m_send_disps,m_local_col_inds,m_rhs_send_inds,flock,partition_table,mpi_communicator,one_norm_array,p) ! in :fMPI:fMPI.f90
+            integer intent(in) :: m_rows
+            integer, optional,intent(in),check(len(m_col_indexes)>=m_n_col_indexes),depend(m_col_indexes) :: m_n_col_indexes=len(m_col_indexes)
+            integer, optional,intent(in),check(len(m_values)>=m_n_values),depend(m_values) :: m_n_values=len(m_values)
+            integer, optional,intent(in),check(len(m_local_col_inds)>=m_n_local_col_indexes),depend(m_local_col_inds) :: m_n_local_col_indexes=len(m_local_col_inds)
+            integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
+            integer, optional,intent(in),check(len(m_rhs_send_inds)>=m_sends),depend(m_rhs_send_inds) :: m_sends=len(m_rhs_send_inds)
+            integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+            integer, target,dimension(m_n_col_indexes),intent(in) :: m_col_indexes
+            complex(kind=8), target,dimension(m_n_values),intent(in) :: m_values
+            integer, target,dimension(flock),intent(in) :: m_num_rec_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_rec_disps
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_num_send_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_send_disps
+            integer, target,dimension(m_n_local_col_indexes),intent(in) :: m_local_col_inds
+            integer, target,dimension(m_sends),intent(in) :: m_rhs_send_inds
+            integer, optional,intent(in),check(len(m_num_rec_inds)>=flock),depend(m_num_rec_inds) :: flock=len(m_num_rec_inds)
+            integer dimension(flock + 1),intent(in),depend(flock) :: partition_table
+            integer intent(in) :: mpi_communicator
+            real(kind=8) dimension(9),intent(out) :: one_norm_array
+            integer intent(out) :: p
+        end subroutine one_norm_series
+        subroutine initial_state(rho0_rows,m_local_rows,rho0,flock,rank_bn,partition_table,mpi_communicator,rho0_v) ! in :fMPI:fMPI.f90
+            integer, optional,intent(in),check(shape(rho0,0)==rho0_rows),depend(rho0) :: rho0_rows=shape(rho0,0)
+            integer intent(in) :: m_local_rows
+            complex(kind=8) dimension(rho0_rows,rho0_rows),intent(in) :: rho0
+            integer, optional,intent(in),check((len(partition_table)-1)>=flock),depend(partition_table) :: flock=(len(partition_table)-1)
+            integer intent(in) :: rank_bn
+            integer dimension(flock + 1),intent(in) :: partition_table
+            integer intent(in) :: mpi_communicator
+            complex(kind=8) dimension(m_local_rows),intent(out),depend(m_local_rows) :: rho0_v
+        end subroutine initial_state
+        subroutine step(m_rows,m_n_col_indexes,m_n_values,m_n_local_col_indexes,n_rho0_v,n_rhot_v,m_sends,m_row_starts,m_col_indexes,m_values,m_num_rec_inds,m_rec_disps,m_num_send_inds,m_send_disps,m_local_col_inds,m_rhs_send_inds,t,rho0_v,flock,partition_table,p,one_norm_array,mpi_communicator,rhot_v,target_precision,m_n_row_starts) ! in :fMPI:fMPI.f90
+            integer intent(in) :: m_rows
+            integer, optional,intent(in),check(len(m_col_indexes)>=m_n_col_indexes),depend(m_col_indexes) :: m_n_col_indexes=len(m_col_indexes)
+            integer, optional,intent(in),check(len(m_values)>=m_n_values),depend(m_values) :: m_n_values=len(m_values)
+            integer, optional,intent(in),check(len(m_local_col_inds)>=m_n_local_col_indexes),depend(m_local_col_inds) :: m_n_local_col_indexes=len(m_local_col_inds)
+            integer, optional,intent(in),check(len(rho0_v)>=n_rho0_v),depend(rho0_v) :: n_rho0_v=len(rho0_v)
+            integer, optional,intent(in),depend(rho0_v) :: n_rhot_v=len(rho0_v)
+            integer, optional,intent(in),check(len(m_rhs_send_inds)>=m_sends),depend(m_rhs_send_inds) :: m_sends=len(m_rhs_send_inds)
+            integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+            integer, target,dimension(m_n_col_indexes),intent(in) :: m_col_indexes
+            complex(kind=8), target,dimension(m_n_values),intent(in),depend(m_n_values) :: m_values
+            integer, target,dimension(flock),intent(in) :: m_num_rec_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_rec_disps
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_num_send_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_send_disps
+            integer, target,dimension(m_n_local_col_indexes),intent(in) :: m_local_col_inds
+            integer, target,dimension(m_sends),intent(in) :: m_rhs_send_inds
+            real(kind=8) intent(in) :: t
+            complex(kind=8) dimension(n_rho0_v),intent(in) :: rho0_v
+            integer, optional,intent(in),check(len(m_num_rec_inds)>=flock),depend(m_num_rec_inds) :: flock=len(m_num_rec_inds)
+            integer dimension(flock + 1),intent(in),depend(flock) :: partition_table
+            integer intent(inout) :: p
+            real(kind=8) dimension(9),intent(inout) :: one_norm_array
+            integer intent(in) :: mpi_communicator
+            complex(kind=8) dimension(n_rhot_v),intent(out),depend(n_rhot_v) :: rhot_v
+            character*2 intent(in) :: target_precision
+            integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
+        end subroutine step
+        subroutine gather_step(m_local_rows,rhot_v,flock,partition_table,root,mpi_communicator,h_aug_rows,rhot) ! in :fMPI:fMPI.f90
+            integer, optional,intent(in),check(len(rhot_v)>=m_local_rows),depend(rhot_v) :: m_local_rows=len(rhot_v)
+            complex(kind=8) dimension(m_local_rows),intent(in) :: rhot_v
+            integer, optional,intent(in),check((len(partition_table)-1)>=flock),depend(partition_table) :: flock=(len(partition_table)-1)
+            integer dimension(flock + 1),intent(in) :: partition_table
+            integer intent(in) :: root
+            integer intent(in) :: mpi_communicator
+            integer intent(in) :: h_aug_rows
+            complex(kind=8) dimension(h_aug_rows,h_aug_rows),intent(out),depend(h_aug_rows) :: rhot
+        end subroutine gather_step
+        subroutine series(m_rows,m_n_row_starts,m_n_col_indexes,m_n_values,m_n_local_col_indexes,n_rho0_v,n_rhot_v,m_sends,m_row_starts,m_col_indexes,m_values,m_num_rec_inds,m_rec_disps,m_num_send_inds,m_send_disps,m_local_col_inds,m_rhs_send_inds,t_1,t_2,rho0_v,steps,flock,partition_table,p,one_norm_array,mpi_communicator,rhot_v_series,target_precision) ! in :fMPI:fMPI.f90
+            integer intent(in) :: m_rows
+            integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)
+            integer, optional,intent(in),check(len(m_col_indexes)>=m_n_col_indexes),depend(m_col_indexes) :: m_n_col_indexes=len(m_col_indexes)
+            integer, optional,intent(in),check(len(m_values)>=m_n_values),depend(m_values) :: m_n_values=len(m_values)
+            integer, optional,intent(in),check(len(m_local_col_inds)>=m_n_local_col_indexes),depend(m_local_col_inds) :: m_n_local_col_indexes=len(m_local_col_inds)
+            integer, optional,intent(in),check(len(rho0_v)>=n_rho0_v),depend(rho0_v) :: n_rho0_v=len(rho0_v)
+            integer, optional,intent(in),depend(rhot_v) :: n_rhot_v=len(rho0_v)
+            integer, optional,intent(in),check(len(m_rhs_send_inds)>=m_sends),depend(m_rhs_send_inds) :: m_sends=len(m_rhs_send_inds)
+            integer, target,dimension(m_n_row_starts),intent(in) :: m_row_starts
+            integer, target,dimension(m_n_col_indexes),intent(in) :: m_col_indexes
+            complex(kind=8), target,dimension(m_n_values),intent(in) :: m_values
+            integer, target,dimension(flock),intent(in) :: m_num_rec_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_rec_disps
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_num_send_inds
+            integer, target,dimension(flock),intent(in),depend(flock) :: m_send_disps
+            integer, target,dimension(m_n_local_col_indexes),intent(in) :: m_local_col_inds
+            integer, target,dimension(m_sends),intent(in) :: m_rhs_send_inds
+            real(kind=8) intent(in) :: t_1
+            real(kind=8) intent(in) :: t_2
+            complex(kind=8) dimension(n_rho0_v),intent(in) :: rho0_v
+            integer intent(in) :: steps
+            integer, optional,intent(in),check(len(m_num_rec_inds)>=flock),depend(m_num_rec_inds) :: flock=len(m_num_rec_inds)
+            integer dimension(flock + 1),intent(in),depend(flock) :: partition_table
+            integer intent(inout) :: p
+            real(kind=8) dimension(9),intent(inout) :: one_norm_array
+            integer intent(in) :: mpi_communicator
+            complex(kind=8) dimension(n_rhot_v,steps + 1),intent(out),depend(n_rhot_v,steps) :: rhot_v_series
+            character*2 intent(in) :: target_precision
+        end subroutine series
+        subroutine gather_series(m_local_rows,steps,rhot_v_series,flock,partition_table,root,mpi_communicator,h_aug_rows,rhot_series) ! in :fMPI:fMPI.f90
+            integer, optional,intent(in),check(shape(rhot_v_series,0)==m_local_rows),depend(rhot_v_series) :: m_local_rows=shape(rhot_v_series,0)
+            integer, optional,intent(in),check((shape(rhot_v_series,1)-1)==steps),depend(rhot_v_series) :: steps=(shape(rhot_v_series,1)-1)
+            complex(kind=8) dimension(m_local_rows,steps + 1),intent(in) :: rhot_v_series
+            integer, optional,intent(in),check((len(partition_table)-1)>=flock),depend(partition_table) :: flock=(len(partition_table)-1)
+            integer dimension(flock + 1),intent(in) :: partition_table
+            integer intent(in) :: root
+            integer intent(in) :: mpi_communicator
+            integer intent(in) :: h_aug_rows
+            complex(kind=8) dimension(h_aug_rows,h_aug_rows,steps + 1),intent(out),depend(h_aug_rows,steps) :: rhot_series
+        end subroutine gather_series
+    end interface 
+end python module fMPI
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/

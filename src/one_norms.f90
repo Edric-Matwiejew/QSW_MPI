@@ -136,8 +136,8 @@ module One_Norms
 
         integer :: i, j
 
-        real(dp) :: start, finish, spmm_time
-        
+        !real(dp) :: start, finish, spmm_time
+
         !MPI environment
         integer :: flock
         integer :: rank
@@ -222,7 +222,7 @@ module One_Norms
                         Y, &
                         MPI_communicator)
 
-            spmm_time = spmm_time + finish - start
+            !spmm_time = spmm_time + finish - start
 
             Y_norms_local = 0
 
@@ -256,8 +256,9 @@ module One_Norms
                             mpi_communicator, &
                             ierr)
 
-            if (est == 0) then
+            if (abs(est) < epsilon(est)) then
                 call mpi_barrier(mpi_communicator, ierr)
+                !write(*,*) "262"
                 exit
             endif
 
@@ -270,11 +271,13 @@ module One_Norms
             if ((k >= 2) .and. (est <= est_old)) then
                 est = est_old
                 call mpi_barrier(mpi_communicator, ierr)
+                !write(*,*) "275"
                 exit
             endif
 
             if (k > itmax) then
                 call mpi_barrier(mpi_communicator, ierr)
+                !write(*,*) "281"
                 exit
             endif
 
@@ -284,7 +287,7 @@ module One_Norms
             do j = 1, t
                 do i = lb, ub
 
-                    if (abs(Y(i, j)) == 0) then
+                    if (abs(Y(i, j)) < epsilon(est)) then
 
                         S(i, j) = 1
 
@@ -304,7 +307,7 @@ module One_Norms
                         rank, &
                         Z, &
                         MPI_communicator)
-            
+
             !$omp parallel do
             do i = 1, A%columns
                 Z_norms(i) = 0
@@ -345,7 +348,6 @@ module One_Norms
                 Z_norms(h_inds_local(i)) = 0
 
             enddo
-
 
             call mpi_gatherv(   h_inds_local, &
                                 t, &
@@ -391,6 +393,7 @@ module One_Norms
 
             if (complete) then
                 call mpi_barrier(mpi_communicator, ierr)
+                !write(*,*) "394"
                 exit
             endif
 
@@ -417,6 +420,7 @@ module One_Norms
 
             if (complete) then
                 call mpi_barrier(mpi_communicator, ierr)
+                !write(*,*) "421"
                 exit
             endif
 
@@ -492,7 +496,7 @@ module One_Norms
         integer :: MPI_communicator
 
         real(dp), dimension(:), allocatable :: one_norms_local, one_norms
-        real(dp) :: local_max
+        !real(dp) :: local_max
 
         integer :: lb_elements, ub_elements
         integer :: i, j
@@ -511,7 +515,7 @@ module One_Norms
 
         if (rank == 0) then
             allocate(one_norms(A%columns))
-        else 
+        else
             allocate(one_norms(0))
         endif
 

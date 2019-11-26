@@ -1,3 +1,26 @@
+!   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+!   Copyright (C) 2019 Edric Matwiejew
+!
+!   This program is free software: you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation, either version 3 of the License, or
+!   (at your option) any later version.
+!
+!   This program is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+!
+!   Module: Operators
+!
+!>  @brief Quantum Stochastic Walk operator formation, manipulation and
+!>  operator specific sparse operations.
+!
+
 module Operators
 
     use :: ISO_Precisions
@@ -8,6 +31,13 @@ module Operators
 
     contains
 
+    !
+    !   Function: Kronecker_Delta
+    !
+    !>  @brief Kronecker delta function of integers i and j.
+    !
+    !>  @details This function is equal to 1 if i = j and 0 otherwise.
+
     function Kronecker_Delta(i, j)
 
         integer :: Kronecker_Delta
@@ -16,6 +46,16 @@ module Operators
         Kronecker_Delta = int((real((i+j)-abs(i-j)))/(real((i+j)+abs(i-j))))
 
     end function Kronecker_Delta
+
+    !
+    !   Subroutine: Prefix_Sum
+    !
+    !>  @brief Prefix sum of an integer array.
+    !
+    !>  @details Perfroms an in-place prefix (or cumulative) sum on an integer
+    !>  array.
+    !>
+    !>> Prefix_Sum([1,2,3]) -> [1,3,6]
 
     subroutine Prefix_Sum(array)
 
@@ -29,15 +69,21 @@ module Operators
 
     end subroutine Prefix_Sum
 
+    !
+    !   Subroutine: Pad_Operator
+    !
+    !>  @brief Zero-pad a square CSR array.
+    !
+    !>  @details Returns a zero-padded version of a square CSR array with
+    !>  'n_pad' zero-valued bottom rows and left columns.
+
     subroutine Pad_Operator(    H, &
                                 n_pad, &
                                 H_pad)
 
-        type(CSR), intent(in) :: H
-        integer, intent(in) :: n_pad
-        type(CSR), intent(out) :: H_pad
-
-        integer :: i
+        type(CSR), intent(in) :: H !< @param Square CSR array.
+        integer, intent(in) :: n_pad !< @param Padding rows and columns.
+        type(CSR), intent(out) :: H_pad !< @param Padded CSR array.
 
         allocate(   H_pad%row_starts(H%rows + n_pad + 1), &
                     H_pad%col_indexes(size(H%col_indexes)), &
@@ -46,54 +92,40 @@ module Operators
         H_pad%rows = H%rows + n_pad
         H_pad%columns = H_pad%rows
 
-        !$omp parallel do
-        do i = 1, H%rows + 1
-            H_pad%row_starts(i) = H%row_starts(i)
-        enddo
-        !$omp end parallel do
+        H_pad%row_starts(1:H%rows + 1) = H%row_starts(1:H%rows + 1)
 
+        H_pad%row_starts(H%rows + 2:H_pad%rows + 1) = H%row_starts(H%rows + 1)
 
-        !$omp parallel do
-        do i = H%rows + 2, H_pad%rows + 1
-            H_pad%row_starts(i) = H%row_starts(H%rows + 1)
-        enddo
-        !$omp end parallel do
+        H_pad%col_indexes(1:size(H%col_indexes)) = &
+            H%col_indexes(1:size(H%col_indexes))
 
-        !$omp parallel do
-        do i = 1, size(H%col_indexes)
-            H_pad%col_indexes(i) = H%col_indexes(i)
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, size(H%values)
-            H_pad%values(i) = H%values(i)
-        enddo
-        !$omp end parallel do
+        H_pad%values(1:size(H%values)) = H%values(1:size(H%values))
 
     end subroutine Pad_Operator
 
+    !
+    !   Subroutine: Symmetrise_Graph_Weights
+    !
+    !>  @brief Symmetrise the values of a structurally symmetric CSR array.
+    !
+    !>  @details Given a CSR array, A, with structurally symmetric non-zero
+    !>  values this returns an array 'values' such that when used in place of
+    !>  A%values in the CSR datatype,
+    !>
+    !>> A(i,j) = max(A(i,j), A(j,i)).
+
     subroutine Symmetrise_Graph_Weights(A, values)
 
-        type(CSR), intent(inout) :: A
-        complex(dp), dimension(:), intent(inout) :: values
+        type(CSR), intent(inout) :: A !< Structurally symmetric CSR array.
+        complex(dp), dimension(:), intent(inout) :: values !< @param Symmetrised values array
 
         integer, dimension(:), allocatable :: offset
         integer :: i, j, k
 
         allocate(offset(A%rows))
 
-        !$omp parallel do
-        do i = 1, A%rows
-            offset(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, size(values)
-            values(i) = A%values(i)
-        enddo
-        !$omp end parallel do
+        offset = 0
+        values = A%values
 
         do i = 1, A%rows - 1
             do j = A%row_starts(i), A%row_starts(i+1) - 1
@@ -128,23 +160,13 @@ module Operators
 
         integer :: i, j
 
-        !sort
-        complex(dp) :: temp
-        integer :: temp_indx
-        integer :: k
-
         allocate(L%row_starts(size(A%row_starts)))
         allocate(L%col_indexes(size(A%col_indexes)))
         allocate(L%values(size(A%values)))
 
         L%rows = A%rows
         L%columns = A%columns
-
-        !$omp parallel do
-        do i = 1, L%rows + 1
-            L%row_starts(i) = A%row_starts(i)
-        enddo
-        !$omp end parallel do
+        L%row_starts = A%row_starts
 
         allocate(row_offsets(L%rows))
 
@@ -159,24 +181,6 @@ module Operators
             row_offsets(A%col_indexes(j)) = row_offsets(A%col_indexes(j)) + 1
             enddo
         enddo
-
-        !!$omp parallel do private(i, temp, temp_indx, j)
-        !do k = 1, L%rows
-        !    do i = L%row_starts(k) + 1, L%row_starts(k + 1) - 1
-        !        temp = L%values(i)
-        !        temp_indx = L%col_indexes(i)
-        !        j = i - 1
-        !        do while (j >= L%row_starts(k) )
-        !            if (L%col_indexes(j) <= temp_indx) exit
-        !                L%values(j + 1) = L%values(j)
-        !                L%col_indexes(j + 1) = L%col_indexes(j)
-        !                j = j - 1
-        !        enddo
-        !        L%values(j + 1) = temp
-        !        L%col_indexes(j + 1) = temp_indx
-        !    enddo
-        !enddo
-        !!$omp end parallel do
 
         call Sort_CSR(L)
 
@@ -205,14 +209,9 @@ module Operators
         allocate(value_elements(L%rows))
         allocate(nz_diag(L%rows))
 
-        !$omp parallel do
-        do i = 1, L%rows
-            value_elements(i) = 0
-            nz_diag(i) = 0
-        enddo
-        !$omp end parallel do
+        value_elements = 0
+        nz_diag(i) = 0
 
-        !$omp parallel do private(j) reduction(+:value_elements)
         do i = 1, L%rows
             do j = L%row_starts(i), L%row_starts(i + 1) - 1
                 value_elements(L%col_indexes(j)) = value_elements(L%col_indexes(j)) &
@@ -222,41 +221,32 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         allocate(row_start(L%rows**2 + 1))
         allocate(col_index(L%rows**2))
 
         row_start(1) = 1
+        row_start(2:size(row_start)) = 0
 
-        !$omp parallel do
-        do i = 1, L%rows**2
-            col_index(i) = 0
-            row_start(i + 1) = 0
-        enddo
-        !$omp end parallel do
+        col_index = 0
 
-        !$omp parallel do private(j, row) firstprivate(value_elements)
         do i = 1, L%rows
             do j = 1, L%rows
                 row = (i - 1)*L%rows + j
-                if ((value_elements(i) + value_elements(j)) /= 0) then
+                if (abs(value_elements(i) + value_elements(j)) > epsilon(0.d0)) then
                     row_start(row + 1) = 1
                     col_index(row) = row
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(row)
         do i = 1, L%rows
             row = (i -1)*L%rows + i
             row_start(row + 1) = row_start(row + 1) + (L%row_starts(i + 1) - L%row_starts(i))
-            if (abs(nz_diag(i)) /= 0) then
+            if (abs(nz_diag(i)) > epsilon(0.d0)) then
                 row_start(row + 1) = row_start(row + 1) - 1
             endif
         enddo
-        !$omp end parallel do
 
         call Prefix_Sum(row_start)
 
@@ -266,17 +256,11 @@ module Operators
         allocate(value_elements_shifted(0:L%rows - 1))
 
         value_elements_shifted(0) = value_elements(L%rows)
-
-        !$omp parallel do
-        do i = 1, L%rows - 1
-            value_elements_shifted(i) = value_elements(i)
-        enddo
-        !$omp end parallel do
+        value_elements_shifted(1:L%rows - 1) = value_elements(i)
 
         lower_offset = (lower_bound - (lower_block - 1)*L%rows) - 1
         upper_offset = (upper_bound - (upper_block - 1)*L%rows) - L%rows
 
-        !$omp parallel do private(j, row, indx, k)
         do i = lower_block, upper_block
             do j = 1 + Kronecker_Delta(i, lower_block)*lower_offset, L%rows &
                 + Kronecker_Delta(i, upper_block)*upper_offset
@@ -318,16 +302,10 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         allocate(B%row_starts(lower_bound:upper_bound + 1))
 
-        !$omp parallel do
-        do i = lower_bound, upper_bound + 1
-            B%row_starts(i) = row_start(i)
-        enddo
-        !$omp end parallel do
-
+        B%row_starts(lower_bound:upper_bound + 1) = row_start(lower_bound:upper_bound + 1)
         B%rows = upper_bound - lower_bound + 1
         B%columns = L%columns**2
 
@@ -360,15 +338,10 @@ module Operators
         allocate(right(H%rows))
         allocate(diag_val(H%rows))
 
-        !$omp parallel do
-        do i = 1, H%rows
-            left(i) = 0
-            right(i) = 0
-            diag_val(i) = 0
-        enddo
-        !$omp end parallel do
+        left = 0
+        right = 0
+        diag_val = 0
 
-        !$omp parallel do private(j)
         do i = 1, H%rows
             do j = H%row_starts(i), H%row_starts(i + 1) - 1
                 if (H%col_indexes(j) < i) then
@@ -380,32 +353,24 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         allocate(row_start(H%rows**2 + 1))
 
         row_start(1) = 1
+        row_start(2:size(row_start)) = 0
 
-        !$omp parallel do
-        do i = 2, size(row_start)
-            row_start(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do private(j, row)
         do i = 1, H%rows
             do j = 1, H%rows
                 row = (i - 1)*H%rows + j
                 row_start(row + 1) = left(i) + (H%row_starts(j + 1) - H%row_starts(j)) + right(i)
-                if ((diag_val(j) == 0) .and. (diag_val(i) /= 0)) then
+                if ((abs(diag_val(j)) < epsilon(0.d0)) .and. (abs(diag_val(i)) > epsilon(0.d0))) then
                     row_start(row + 1) = row_start(row + 1) + 1
                 endif
-                if ((diag_val(i) == diag_val(j)) .and. (diag_val(i) /= 0)) then
+                if ((abs(diag_val(i) - diag_val(j)) < epsilon(0.d0)) .and. (abs(diag_val(i)) > epsilon(0.d0))) then
                     row_start(row + 1) = row_start(row + 1) - 1
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         call Prefix_Sum(row_start)
 
@@ -415,7 +380,6 @@ module Operators
         lower_offset = (lower_bound - (lower_block - 1)*H%rows) - 1
         upper_offset = (upper_bound - (upper_block - 1)*H%rows) - H%rows
 
-        !$omp parallel do private(j, row)
         do i = lower_block, upper_block
             do j = 1 + Kronecker_Delta(lower_block, i)*lower_offset, H%rows + Kronecker_Delta(upper_block, i)*upper_offset
 
@@ -436,7 +400,7 @@ module Operators
                 B%col_indexes(row_start(row) + left(i): row_start(row) + left(i) + left(j) - 1) = &
                         & H%col_indexes(H%row_starts(j):H%row_starts(j) + left(j) - 1) + (i - 1)*H%columns
 
-                if (abs(diag_val(j) - diag_val(i)) /= 0) then
+                if (abs(diag_val(j) - diag_val(i)) > epsilon(0.d0)) then
                     B%values(row_start(row) + left(i) + left(j)) = cmplx(0_dp, -1_dp, dp)*(diag_val(j) - diag_val(i))
                     B%col_indexes(row_start(row) + left(i) + left(j)) = row
                 endif
@@ -448,16 +412,10 @@ module Operators
 
             enddo
         enddo
-        !$omp end parallel do
 
         allocate(B%row_starts(lower_bound:upper_bound + 1))
 
-        !$omp parallel do
-        do i = lower_bound, upper_bound + 1
-            B%row_starts(i) = row_start(i)
-        enddo
-        !$omp end parallel do
-
+        B%row_starts(lower_bound:upper_bound + 1) = row_start(lower_bound:upper_bound + 1)
         B%rows = upper_bound - lower_bound + 1
         B%columns = H%columns**2
 
@@ -505,7 +463,7 @@ module Operators
         !$omp end parallel do
 
         do i = 1, A%rows
-            if (out_degrees(i) /= 0) then
+            if (abs(out_degrees(i)) > epsilon(0.d0)) then
                 B%row_starts(i + 1 : A%rows + 1) = B%row_starts(i + 1 : A%rows + 1) + 1
             endif
         enddo
@@ -582,9 +540,9 @@ module Operators
         integer :: N
 
         !sort
-        complex(dp) :: temp
-        integer :: temp_indx
-        integer :: k
+        !complex(dp) :: temp
+        !integer :: temp_indx
+        !integer :: k
 
         N = H%rows
 
@@ -718,17 +676,17 @@ module Operators
         do i = 1, N
             row = (i - 1)*N + i
             row_start(row + 1) = row_start(row + 1) + L%row_starts(i + 1) - L%row_starts(i)
-            if (abs(L_diag_vals(i)) /= 0) then
+            if (abs(L_diag_vals(i)) > epsilon(0.d0)) then
                 row_start(row + 1) = row_start(row + 1) - 1
             endif
             do j = 1, N
                 row = (i - 1)* N + j
                 row_start(row + 1) = row_start(row + 1) + H_left(i) &
                     + (H%row_starts(j + 1) - H%row_starts(j)) + H_right(i)
-                if (abs(H_diag_vals(j)) /= 0) then
+                if (abs(H_diag_vals(j)) > epsilon(0.d0)) then
                     row_start(row + 1) = row_start(row + 1)-1
                 endif
-                if (abs(diag_vals(row)) /= 0) then
+                if (abs(diag_vals(row)) > epsilon(0.d0)) then
                     row_start(row + 1) = row_start(row + 1) + 1
                 endif
             enddo
@@ -752,7 +710,7 @@ module Operators
 
                 lower_indx = row_start(row)
 
-                if (diag_vals(row) /= 0) then
+                if (abs(diag_vals(row)) > epsilon(0.d0)) then
                     B%values(lower_indx) = diag_vals(row)
                     B%col_indexes(lower_indx) = row
                     lower_indx = lower_indx + 1
@@ -801,7 +759,7 @@ module Operators
                     upper_indx = lower_indx + L_left(i) - 1
 
                     B%values(lower_indx:upper_indx) = &
-                            & omega*abs(L%values(L%row_starts(i):L%row_starts(i) + L_left(i) - 1))**2 !!!!
+                            & omega*abs(L%values(L%row_starts(i):L%row_starts(i) + L_left(i) - 1))**2
                     B%col_indexes(lower_indx:upper_indx) = &
                             & L%col_indexes(L%row_starts(i):L%row_starts(i) + L_left(i) - 1)*(L%rows + 1) - L%rows
 
@@ -831,24 +789,6 @@ module Operators
 
         B%rows = upper_bound - lower_bound + 1
         B%columns = H%columns**2
-
-        !!$omp parallel do private(i, temp, temp_indx, j)
-        !do k = lower_bound, upper_bound
-        !    do i = B%row_starts(k) + 1, B%row_starts(k + 1) - 1
-        !        temp = B%values(i)
-        !        temp_indx = B%col_indexes(i)
-        !        j = i - 1
-        !        do while (j >= B%row_starts(k) )
-        !            if (B%col_indexes(j) <= temp_indx) exit
-        !                B%values(j + 1) = B%values(j)
-        !                B%col_indexes(j + 1) = B%col_indexes(j)
-        !                j = j - 1
-        !        enddo
-        !        B%values(j + 1) = temp
-        !        B%col_indexes(j + 1) = temp_indx
-        !    enddo
-        !enddo
-        !!$omp end parallel do
 
         call Sort_CSR(B)
 
@@ -1009,8 +949,6 @@ module Operators
         L_inout%col_indexes(size(sink_sites) + 1: augs) = source_sites
         L_inout%values(size(sink_sites) + 1: augs) = sqrt(abs(source_rates))
 
-        write(*,*) "HELLO"
-
         !$omp parallel do
         do i = 2, L_inout%rows + 1
             L_inout%row_starts(i) = 0
@@ -1056,9 +994,9 @@ module Operators
         integer :: N
 
         !sort
-        complex(dp) :: temp
-        integer :: temp_indx
-        integer :: k
+        !complex(dp) :: temp
+        !integer :: temp_indx
+        !integer :: k
 
         N = H%rows
 
@@ -1194,17 +1132,17 @@ module Operators
         do i = 1, N
             row = (i - 1)*N + i
             row_start(row + 1) = row_start(row + 1) + L%row_starts(i + 1) - L%row_starts(i)
-            if (abs(L_diag_vals(i)) /= 0) then
+            if (abs(L_diag_vals(i)) > epsilon(0.d0)) then
                 row_start(row + 1) = row_start(row + 1) - 1
             endif
             do j = 1, N
                 row = (i - 1)* N + j
                 row_start(row + 1) = row_start(row + 1) + H_left(i) &
                     + (H%row_starts(j + 1) - H%row_starts(j)) + H_right(i)
-                if (abs(H_diag_vals(j)) /= 0) then
+                if (abs(H_diag_vals(j)) > epsilon(0.d0)) then
                     row_start(row + 1) = row_start(row + 1)-1
                 endif
-                if (abs(diag_vals(row)) /= 0) then
+                if (abs(diag_vals(row)) > epsilon(0.d0)) then
                     row_start(row + 1) = row_start(row + 1) + 1
                 endif
             enddo
@@ -1228,7 +1166,7 @@ module Operators
 
                 lower_indx = row_start(row)
 
-                if (diag_vals(row) /= 0) then
+                if (abs(diag_vals(row)) > epsilon(0.d0)) then
                     B%values(lower_indx) = diag_vals(row)
                     B%col_indexes(lower_indx) = row
                     lower_indx = lower_indx + 1
@@ -1311,24 +1249,6 @@ module Operators
 
         B%rows = upper_bound - lower_bound + 1
         B%columns = H%columns**2
-
-        !!$omp parallel do private(j, temp, temp_indx)
-        !do k = lower_bound, upper_bound
-        !    do i = B%row_starts(k) + 1, B%row_starts(k + 1) - 1
-        !        temp = B%values(i)
-        !        temp_indx = B%col_indexes(i)
-        !        j = i - 1
-        !        do while (j >= B%row_starts(k) )
-        !            if (B%col_indexes(j) <= temp_indx) exit
-        !                B%values(j + 1) = B%values(j)
-        !                B%col_indexes(j + 1) = B%col_indexes(j)
-        !                j = j - 1
-        !        enddo
-        !        B%values(j + 1) = temp
-        !        B%col_indexes(j + 1) = temp_indx
-        !    enddo
-        !enddo
-        !!$omp end parallel do
 
         call Sort_CSR(B)
 
