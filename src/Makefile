@@ -20,7 +20,7 @@ else
 endif
 
 # Determine extension of generated f2py shared object libraries.
-ifeq ($(shell PYTHON_CALL -V |& cut -d " "  -f 2 | head -c 1), 3)
+ifeq ($(shell $(PYTHON_CALL) -V |& cut -d " "  -f 2 | head -c 1), 3)
 	EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
 else
 	EXT_SUFFIX := '.so'
@@ -36,7 +36,7 @@ $(OBJDIR)/%.o: %.f90
 
 %.o: %.mod
 
-# fMPI f2py shared object library. 
+# fMPI f2py shared object library.
 $(PYDIR)/fMPI$(EXT_SUFFIX):  $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o operators.o one_norms.o expm.o) $(PYDIR)/foperators$(EXT_SUFFIX) fMPI.f90
 	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -c fMPI.pyf iso_precisions.f90 sparse.f90 operators.f90 one_norms.f90 expm.f90 -m fMPI fMPI.f90
 	mv fMPI$(EXT_SUFFIX) $(PYDIR)
@@ -56,5 +56,5 @@ $(OBJDIR)/iso_precisions.o: iso_precisions.f90
 ####
 
 clean:
-	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(OBJDIR)/*.so $(PYDIR)/*.so
+	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(OBJDIR)/*.so $(PYDIR)/*.so *.so *.o
 
