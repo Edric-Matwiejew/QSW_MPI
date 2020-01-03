@@ -51,5 +51,9 @@ $(OBJDIR)/iso_precisions.o: iso_precisions.f90
 ####
 
 clean:
+	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod
+
+veryclean:
 	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
+
 
