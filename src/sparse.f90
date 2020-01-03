@@ -1267,7 +1267,10 @@ module Sparse
         ! MPI environment
         integer :: ierr
 
-        real(dp), save :: start, finish, calc, comm
+        real(dp), save :: start_calc, finish_calc, start_comm, finish_comm, calc, comm, start_guff, finish_guff, guff
+        real(dp), save :: start_send, end_send, send
+
+        start_guff = MPI_wtime()
 
         lb = partition_table(rank + 1)
         ub = partition_table(rank + 2) - 1
@@ -1285,6 +1288,8 @@ module Sparse
         endif
 
         if (.not. allocated(u_resize)) then
+            !comm = 0
+            !calc = 0
             allocate(u_resize(lb:ub_resize))
             allocate(rec_values(num_rec))
             allocate(send_values(num_send))
@@ -1297,14 +1302,23 @@ module Sparse
                 deallocate(rec_values)
                 deallocate(send_values)
             endif
+            !write(*,*) "calc", calc, "comm", comm, "sum", calc + comm, "guff", guff, "Allreduce + calc", send + calc, "ALL", send
             return
         endif
 
         u_resize(lb:ub) = u_local
 
+        finish_guff = MPI_wtime()
+
+        guff = guff + finish_guff - start_guff
+
+        start_comm = MPI_wtime()
+
         do i = 1, num_send
             send_values(i) = u_resize(A%RHS_send_inds(i))
         enddo
+
+        start_send = MPI_wtime()
 
         call MPI_alltoallv( send_values, &
                             A%num_send_inds, &
@@ -1317,9 +1331,16 @@ module Sparse
                             MPI_communicator, &
                             ierr)
 
+        end_send = MPI_wtime()
+        send = send + end_send - start_send
+
+        finish_comm = MPI_wtime()
+
         u_resize(lb_resize:ub_resize) = rec_values
 
-        comm = comm + finish - start
+        comm = comm + finish_comm - start_comm
+
+        start_calc = MPI_wtime()
 
         v_local = 0
 
@@ -1332,12 +1353,16 @@ module Sparse
             enddo
         enddo
 
-        calc = calc + finish - start
+        finish_calc = MPI_wtime()
+
+        calc = calc + finish_calc - start_calc
 
         if (current_it == max_it) then
             deallocate(u_resize)
             deallocate(rec_values)
             deallocate(send_values)
+            !write(*,*) "calc", calc, "comm", comm, "sum", calc + comm, "guff", guff
+            !write(*,*) "AllReduce", send
         endif
 
     end subroutine SpMV_Series

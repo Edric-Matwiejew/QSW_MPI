@@ -16,7 +16,7 @@
 
 !   Module: Expm
 !
-!>  @brief Action of the complex matrix exponential on a vector parallalized 
+!>  @brief Action of the complex matrix exponential on a vector parallalized
 !>  using MPI.
 !
 !>  @deatils This module implements Algorithms 3.2 and 5.2 as described in
@@ -24,7 +24,7 @@
 !>  exponential integrators" by Awad H. Al-Mohy and Nicholas J, Higham,
 !>  DOI: 10.1137/100788860.
 
-!>  @note There are two omissions. Firstly, optional balancing of the input 
+!>  @note There are two omissions. Firstly, optional balancing of the input
 !>  matrix is not included. Secondly, the norm of the input matrix is not
 !>  minimised via reduction of the Frobenius norm.
 
@@ -432,7 +432,7 @@ module Expm
         integer :: rank
         integer :: ierr
 
-        real(dp) :: start, finish
+        real(dp) :: start, finish, norm, norm_start, norm_finish
 
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
@@ -507,9 +507,14 @@ module Expm
         B_temp_1(lb:ub) = B(lb:ub)
         C(lb:ub) = B(lb:ub)
 
+        start = MPI_wtime()
         do i = 1, s
 
+            norm_start = MPI_wtime()
             c_1 = Infinity_Norm(B_temp_1, MPI_communicator)
+            norm_finish = MPI_wtime()
+
+            norm = norm + norm_finish - norm_start
 
             do j = 1, m_star
 
@@ -525,13 +530,19 @@ module Expm
 
                 B_temp_2(lb:ub) = B_temp_2(lb:ub)/real(s*j, dp)
 
+                norm_start = MPI_wtime()
                 c_2 = Infinity_Norm(B_temp_2, MPI_communicator)
+                norm_finish = MPI_wtime()
+                norm = norm + norm_finish - norm_start
 
 
                 C(lb:ub) = C(lb:ub) + B_temp_2(lb:ub)
 
+                norm_start = MPI_wtime()
                 if ((c_1 + c_2) <= &
                     (tol*Infinity_Norm(C, MPI_communicator))) then
+                    norm_finish = MPI_wtime()
+                    norm = norm + norm_finish - norm_start
                     exit
                 endif
 
@@ -544,6 +555,9 @@ module Expm
             B_temp_1(lb:ub) = C(lb:ub)
 
         enddo
+        finish = MPI_wtime()
+
+        !write(*,*) "LOOP", finish - start, "norm", norm
 
         ! Final call to deallocate saved arrays.
         call SpMV_Series(   A_temp, &

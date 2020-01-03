@@ -13,10 +13,10 @@ Path("graphs/complete_graphs").mkdir(parents = True, exist_ok = True)
 np.random.seed(1)
 
 r1 = 2
-r2 = 21
+r2 = 56
 
 r1_complete = 2
-r2_complete =  10 #22
+r2_complete =  21
 
 for i in range(r1,r2):
 
@@ -48,7 +48,8 @@ for i in range(r1,r2):
 for i in range(r1,r2):
 
     graph = nx.gnm_random_graph(i**2, int((i**2)*np.log(i**2)), seed = None, directed = False)
-    G = nx.to_scipy_sparse_matrix(graph)
+    rcm = list(nx.utils.rcm.cuthill_mckee_ordering(graph))
+    G = nx.to_scipy_sparse_matrix(graph, nodelist = rcm)
     G = sparse.csr_matrix(G, dtype = np.float64)
 
     for j in range(0, len(G.data)):
