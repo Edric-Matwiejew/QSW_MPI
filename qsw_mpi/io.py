@@ -183,14 +183,14 @@ class File(object):
         :type spacing: integer
         """
 
-        titles = ["series name", "initial state", "omega", "steps", "t1", "t2"]
+        titles = ["series name", "initial state", "omega", "steps", "t1", "tq"]
 
         series_names = []
         inital_states = []
         omegas = []
         steps = []
         t1 = []
-        t2 = []
+        tq = []
 
         for item in self.File['series']:
             series_names.append(str(item))
@@ -198,9 +198,9 @@ class File(object):
             omegas.append(float(self.File['series'][str(item)].attrs['omega']))
             steps.append(int(self.File['series'][str(item)].attrs['steps']))
             t1.append(float(self.File['series'][str(item)].attrs['t1']))
-            t2.append(float(self.File['series'][str(item)].attrs['t2']))
+            tq.append(float(self.File['series'][str(item)].attrs['tq']))
 
-        data = [titles] + list(zip(series_names, inital_states, omegas, steps, t1, t2))
+        data = [titles] + list(zip(series_names, inital_states, omegas, steps, t1, tq))
 
         for i, d in enumerate(data):
             line = '|'.join(str(x).ljust(spacing) for x in d)
