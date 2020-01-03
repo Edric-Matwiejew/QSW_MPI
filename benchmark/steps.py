@@ -17,9 +17,7 @@ def benchmark(fi, log):
             log = open(log, 'a')
         else:
             log = open(log, 'w')
-            log.write(
-                    'file,system size,Super-operator nnz,norm,construct t,reconcile communication t,one norms t,step t,total t\n')
-
+            log.write('file,system size,Super-operator nnz,norm,construct t,reconcile communication t,one norms t,step t,total t\n')
 
     total_start = time.time()
 
@@ -39,25 +37,27 @@ def benchmark(fi, log):
 
     total_end = time.time()
 
+    local_M_nnz = test_system.M_values.shape[0]
+    total_M_nnz = comm.reduce(local_M_nnz, op = MPI.SUM, root = 0)
+
     if rank == 0:
         pops = qsw.measure.populations(rho = rhot)
 
     if rank == 0:
         norm = np.sum(pops)
         system_size = H.shape[0]
-        M_nnz = test_system.M_values.shape[0]
         step_time = step_end - step_start
         total_time = total_end - total_start
 
         log.write('{}, {}, {}, {}, {}, {}, {}, {}, {}\n'.format(
             fi,
             system_size,
-            M_nnz,
+            total_M_nnz,
             norm,
             test_system.construction_time,
             test_system.reconcile_time,
             test_system.one_norm_time,
-            step_time,
+            test_system.step_time,
             total_time))
 
         log.close()

@@ -1,6 +1,14 @@
 #!/bin/bash
 
-mkdir -p results
+if [ -e results ]; then
+	rm results/*
+else
+	mkdir -p results
+fi
+
+if [ -e graphs ]; then
+	rm -r graphs/*
+fi
 
 python3 graphgen.py
 
@@ -17,25 +25,25 @@ for node in ${nodes[@]}; do
 	echo "Line Graphs" >> $terminal_out
 	for file in `ls -v graphs/line_graphs/*.npz`; do
 		echo "Running $file on $node nodes..."
-		(time mpiexec -N $node python3 steps.py $file "results/benchmark_lines_$node.csv") &>> $terminal_out
+		(time mpiexec --allow-run-as-root -N $node python3 steps.py $file "results/benchmark_lines_$node.csv") &>> $terminal_out
 	done
 
 	echo "Square Grids" >> $terminal_out
 	for file in `ls -v graphs/grid_graphs/*.npz`; do
 		echo "Running $file on $node nodes..."
-		(time mpiexec -N $node python3 steps.py $file "results/benchmark_grids_$node.csv") &>> $terminal_out
+		(time mpiexec --allow-run-as-root -N $node python3 steps.py $file "results/benchmark_grids_$node.csv") &>> $terminal_out
 	done
 
 	echo "Random Graphs" >> $terminal_out
 	for file in `ls -v graphs/random_graphs/*.npz`; do
 		echo "Running $file on $node nodes..."
-		(time mpiexec -N $node python3 steps.py $file "results/benchmark_randoms_$node.csv") &>> $terminal_out
+		(time mpiexec --allow-run-as-root -N $node python3 steps.py $file "results/benchmark_randoms_$node.csv") &>> $terminal_out
 	done
 
 	echo "Complete Graphs" >> $terminal_out
 	for file in `ls -v graphs/complete_graphs/*.npz`; do
 		echo "Running $file on $node nodes..."
-		(time mpiexec -N $node python3 steps.py $file "results/benchmark_completes_$node.csv") &>> $terminal_out
+		(time mpiexec --allow-run-as-root -N $node python3 steps.py $file "results/benchmark_completes_$node.csv") &>> $terminal_out
 	done
 
 done

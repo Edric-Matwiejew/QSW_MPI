@@ -22,7 +22,7 @@ for i, graph in enumerate(test_graphs):
 
     plt.subplot(1, 4, i + 1)
     for j, df in enumerate(dfs):
-        plt.scatter(df["Super-operator nnz"], df["total t"], label = results[j])
+        plt.scatter(df["Super-operator nnz"], df["step t"], label = results[j])
 
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
     plt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))

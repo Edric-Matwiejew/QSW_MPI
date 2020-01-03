@@ -384,6 +384,8 @@ class walk(object):
         if precision is None:
             precision = "dp"
 
+        start = time.time()
+
         rhot_v = fMPI.step(
                 self.M_rows,
                 self.M_row_starts,
@@ -402,6 +404,10 @@ class walk(object):
                 self.one_norms,
                 self.MPI_communicator.py2f(),
                 precision)
+
+        end = time.time()
+
+        self.step_time = end - start
 
         if save:
 
