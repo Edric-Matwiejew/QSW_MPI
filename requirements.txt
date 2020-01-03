@@ -1,6 +1,5 @@
 numpy
 scipy
-mpi4py
 h5py
 networkx
 matplotlib
