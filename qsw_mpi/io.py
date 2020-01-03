@@ -1,14 +1,58 @@
+#   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+#   Copyright (C) 2019 Edric Matwiejew
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 from scipy import sparse as sp
 import h5py
+from os import path
+
+"""
+Non-paralel input/output operations.
+"""
+
+def _qsw_extension(filename):
+    """
+    Ensures input and output file names end with a .qsw extension.
+    """
+    if path.splitext(filename)[-1] == '.qsw':
+        return filename
+    else:
+        return filename + '.qsw'
 
 class File(object):
 
+    """ :class:`File` handels the creation of .qsw files and the accessing of data contained within existing .qsw files. It also provides convenience functions to list the :meth:`~qsw_mpi.MPI.walk.step` and :meth:`~qsw_mpi.MPI.series` data contained within an existing .qsw file.
+
+    :param filename: File name of the .qsw file to open or create.
+    :type filename: string
+    """
+
     def __init__(self, filename):
-        self.File = h5py.File(filename + '.qsw',"a")
+        self.File = h5py.File(_qsw_extension(filename),"a")
 
     def load_csr(self, group):
+        """
+        Retrive an (:math:`\\tilde{N}, \\tilde{N}`) SciPy CSR sparse matrix from a .qsw file group.
 
+        :param group: Name of the target group in the .qsw file.
+        :type group: string
+
+        :returns A:
+        :rtype: SciPy complex CSR matrix.
+        """
         csr = sp.csr_matrix(
                 (np.array(self.File[group]['data'], dtype = np.complex128),
                 np.array(self.File[group]['indices'], dtype =np.int32),
@@ -18,12 +62,30 @@ class File(object):
         return csr
 
     def H(self):
+        """
+        Returns the graph Hamiltonian associated with the .qsw file.
+
+        :return: H
+        :type: SciPy complex CSR matrix
+        """
         return self.load_csr('H')
 
     def L(self):
+        """
+        Returns the Lindblad operator matrix associated with the .qsw file.
+
+        :return: H
+        :type: Scipy complex CSR matrix
+        """
         return self.load_csr('L')
 
     def sources(self):
+        """
+        Returns sources associated with the .qsw file.
+
+        :return:  A tuple containing two arrays. `source_sites` contains the graph node to which each source is connected and `source_rates` contains the transition rate from each source.
+        :rtype: ([M], [M]), (integer, float), tuple
+        """
         if self.File.attrs['# sources'] > 0:
             return (np.array(self.File['sources']['source sites'], dtype = np.int32), \
                     np.array(self.File['sources']['source rates'], dtype = np.float64))
@@ -31,6 +93,13 @@ class File(object):
             return (None, None)
 
     def sinks(self):
+        """
+        Returns sinks associated with the .qsw file.
+
+        :return: A tuple containing two arrays. `sink_sites` contains the graph node to which each source is connected and `sink_rates` contains the transition rate to each sink.
+        :rtype: ([M], [M]), (integer, float), tuple
+        """
+
         if self.File.attrs['# sinks'] > 0:
             return (np.array(self.File['sinks']['sink sites'], dtype = np.int32), \
                     np.array(self.File['sinks']['sink rates'], dtype = np.float64))
@@ -38,6 +107,16 @@ class File(object):
             return (None, None)
 
     def initial_state(self, state):
+        """
+        Returns the initial state of the density operator, :math:`\\rho(0)`, associated with a .qsw file.
+
+
+        :param state: Name of the initial state.
+        :type state: string
+
+        :return: :math:`\\rho(0)`.
+        :rtype: (:math:`\\tilde{N}, tilde{N}`), complex
+        """
 
         if self.File['initial states gen'][str(name)] is 'FreeQSW':
             raise NameError("FreeQSW generated initial states are not saved to file.")
@@ -45,13 +124,36 @@ class File(object):
         return np.array(self.File['initial states'][str(name)], dtype = np.complex128)
 
     def step(self, name):
+        """
+        Returns a saved :math:`\\rho(t)`.
+
+        :param name: Name of the step.
+        :type name: string
+
+        :return: :math:`\\rho(t)`.
+        :rtype: (:math:`\\tilde{N}, \\tilde{N}`)
+        """
         return np.array(self.File['steps'][str(name)], dtype = np.complex128)
 
     def series(self, name):
+        """
+        Returns a saved time series, :math:`[\\rho(t_1),\\rho(t_2), ..., \\rho(t_q)]`.
+
+        :param name: Name of the series.
+        :type name: string
+
+        :return: :math:`[\\rho(t_1),\\rho(t_2),..., \\rho(t_q)]`
+        :rtype: (:math:`\\tilde{N}, \\tilde{N}`), complex, array
+        """
         return np.array(self.File['series'][str(name)], dtype = np.complex128)
 
     def list_steps(self, spacing = 15):
+        """
+        Gives a summary of the :math:`\\rho(t)` stored in the .qsw file. `list_steps` prints the step names, initial state names (:math:`\\rho(t_0)`), omega (:math:`\\omega`) and the simulation times (:math:`t`) in a human-readable format.
 
+        :param spacing: Optional, default = 15. The width of each column in number of characters.
+        :type spacing: integer
+        """
         titles = ["step name", "initial state", "omega", "t"]
 
         step_names = []
@@ -74,6 +176,12 @@ class File(object):
                 print('-' * len(line))
 
     def list_series(self, spacing = 15):
+        """
+        Gives a summary of the :math:`\\rho_{series} = [\\rho(t_1), ..., \\rho(t_q)]` stored in the .qsw file. `list_series` prints the series names, initial state names (:math:`\\rho(t_1)`), omega (:math:`\\omega`) and the simulation times (:math:`t_1, t_q`) in a human-readable format.
+
+        :param spacing: Optional, default = 15. The width of each column in number of characters.
+        :type spacing: integer
+        """
 
         titles = ["series name", "initial state", "omega", "steps", "t1", "t2"]
 
@@ -101,6 +209,16 @@ class File(object):
                 print('-' * len(line))
 
     def system_attributes(self):
+        """
+        Return meta-data contained with a .qsw file.
+
+        :return: {"size": :math:`\\tilde{N}` (integer), \
+                "H nnz": non-zeros in :math:`H` (integer), \
+                "L nnz": non-zeros in :math:`L` (integer), \
+                "# sources": number of sources (integer), \
+                "# sinks": number of sinks (integer)}
+        :rtype: dictionary
+        """
         system = {
                 "size":int(self.File['H'].attrs['size']),
                 "H nnz":int(self.File['H'].attrs['nnz']),
@@ -110,45 +228,10 @@ class File(object):
         return system
 
     def close(self):
+        """
+        Close the opened .qsw file.
+        """
         self.File.close()
-
-
-def load_system(filename, MPI_communicator):
-
-    rank = MPI_communicator.Get_rank()
-
-    if rank == 0:
-        system = File(str(filename))
-        H = system.H()
-        L = system.L()
-        sources = system.sources()
-        sinks = system.sinks()
-        size = H.shape[0]
-        system.close()
-    else:
-        size = None
-        system = None
-        sources = (None, None)
-        sinks = (None, None)
-
-    size = MPI_communicator.bcast(size, root = 0)
-    sources = MPI_communicator.bcast(sources, root=0)
-    sinks = MPI_communicator.bcast(sinks, root=0)
-
-    if rank != 0:
-        H = sp.csr_matrix((size,size), dtype = np.complex128)
-        L = sp.csr_matrix((size,size), dtype = np.complex128)
-
-    H.data = MPI_communicator.bcast(H.data, root = 0)
-    H.indices = MPI_communicator.bcast(H.indices, root = 0)
-    H.indptr = MPI_communicator.bcast(H.indptr, root = 0)
-
-    L.data = MPI_communicator.bcast(L.data, root = 0)
-    L.indices = MPI_communicator.bcast(L.indices, root = 0)
-    L.indptr = MPI_communicator.bcast(L.indptr, root = 0)
-
-    return H, L, sources, sinks
-
 
 def set_file(
         filename,
@@ -160,7 +243,34 @@ def set_file(
         sink_rates,
         action = "a"):
 
-    output = h5py.File(filename + ".qsw", action)
+    """
+    Creates a .qsw file on disk storing the information needed to recreate a given system. If the file already exists, it can be set as the destination for additional simulations.
+
+    :param filename: Name of the .qsw file.
+    :type filename: string
+
+    :param H: :math:`H`
+    :type H: (N, N), complex
+
+    :param L: :math:`L`
+    :type L: (N, N), complex
+
+    :param source_sites: Vertex in :math:`G` to which a source is attached.
+    :type source_sites: integer
+
+    :param source_rates: Transition rates of attached sources.
+    :type source_rates: float
+
+    :param sink_sites: Vertex in :math:`G` to which a sink is attached.
+    :type sink_sites: integer
+
+    :param sink_rates: Transition rates of attached sinks.
+    :type sink_rates: float
+
+    :param action: Optional, default = "a". h5py file creation flag.
+    :type action: string
+    """
+    output = h5py.File(_qsw_extension(filename), action)
 
     if 'H' not in output:
         H_out = output.create_group('H')

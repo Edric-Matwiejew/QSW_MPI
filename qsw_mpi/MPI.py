@@ -1,3 +1,19 @@
+#   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+#   Copyright (C) 2019 Edric Matwiejew
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 from scipy import sparse as sp
 from mpi4py import MPI
@@ -14,22 +30,17 @@ def load_walk(
         MPI_communicator):
     """ Initialize a previously created :class:`walk` using a .qsw file.
 
-    :param omega: Interpolation paramater (:math:`\omega`) \
-            in the stochastic walk master equation, \
-            must satisfy :math:`0 \geq \omega \leq 1`.
-    :type omega: numpy.real64
+    :param omega: :math:`\omega`
+    :type omega: float
 
-    :param filename: Target file. Must have a .qsw extention and not be currently open.
-    :type filename: str
+    :param filename: Target .qsw file to open.
+    :type filename: string
 
-    :param MPI_communicator: An MPI communicator created using mpi4py.
-    :type MPI_communicator: MPI intracommunicator
+    :param MPI_communicator: MPI communicator
 
-    :return: A :class:`walk` object initialized using the input systems's H, L, \
-            sources, and sinks data. The :class:`walk.file` parameter is set to the \
-            input file.
+    :return: A :class:`walk` object initialized using the input systems's :math:`H`, :math:`L`, sources, and sinks data. The :class:`walk.file` parameter is set to the input file.
     """
-    H, L, sources, sinks = io.load_system(filename, MPI_communicator)
+    H, L, sources, sinks = load_system(filename, MPI_communicator)
 
     walk_out = walk(omega, H, L, MPI_communicator, sources, sinks)
     walk_out.File(filename, action = "a")
@@ -37,33 +48,26 @@ def load_walk(
     return walk_out
 
 class walk(object):
-    """The :class:`walk` object handels the creation of distributed superoperators, density matrices and system propagation in an MPI environment. It also enables the saving of results and input data to a .qsw file. This object and its contianing methods will only function correctly if called within an MPI instance, as shown in the examples.
+    """The :class:`walk` object handels the creation of distributed :math:`\mathcal{L}`, :math:`\\rho(0)` and system propagation in an MPI environment. It also enables the saving of results and input data to a .qsw file. This object and its containing methods will only function correctly if called within an MPI instance, as shown in the examples.
 
-    :param omega: Interpolation paramater (:math:`\omega`) \
-        in the stochastic walk master equation, \
-        must satisfy :math:`0 \geq \omega \leq 1`.
-    :type omega: numpy.real64
+    :param omega: :math:`\omega`
+    :type omega: float
 
-    :param H: The system Hamiltonian, a Hermitian matrix.
-    :type H: numpy.complex128
+    :param H: :math:`H`
+    :type H: (N, N), complex
 
-    :param L: Matrix resulting from summation of the system Lindblad operators.\
-            May be non-hermitian.
-    :type L: numpy.complex128
+    :param L: :math:`L`
+    :type L: (N, N), complex
 
-    :param MPI_communicator: An MPI communicator created using mpi4py.
-    :type MPI_communicator: MPI intracommunicator
+    :param MPI_communicator: MPI communicator
 
-    :param sources: Tuple containing a list of  absorption sites and the \
-            corresponding absorption rates.
-    :type sources: (numpy.int32, numpy.float64), optional
+    :param sources: Contains a list of  absorption sites and the corresponding absorption rates.
+    :type sources: ([M], [M]), (integer, float), tuple, optional
 
-    :param sinks: Tuple containing a list of the emission sites and the\
-            corresponding absorption rates.
-    :type sinks: (numpy.int32, numpy.float64), optional
+    :param sinks: Contains a list of the emission sites and the corresponding absorption rates.
+    :type sinks: ([M], [M]), (integer, float), tuple, optional
 
-    :return: A distributed :class:`walk` object containing an initialized \
-            superoperator.
+    :return: A :class:`walk` object with a :math:`\mathcal{L}` distributed over an MPI communicator.
     """
     def __init__(
             self,
@@ -100,12 +104,12 @@ class walk(object):
             self.n_sinks = len(self.sink_sites)
 
             source_idx = np.argsort(sources[0])
-            self.source_sites = sources[0][source_idx]
-            self.source_rates = sources[1][source_idx]
+            self.source_sites = np.array(sources[0])[source_idx]
+            self.source_rates = np.array(sources[1])[source_idx]
 
             sink_idx = np.argsort(sinks[0])
-            self.sink_sites = sinks[0][sink_idx]
-            self.sink_rates = sinks[1][sink_idx]
+            self.sink_sites = np.array(sinks[0])[sink_idx]
+            self.sink_rates = np.array(sinks[1])[sink_idx]
 
         elif self.source_sites is not None:
 
@@ -116,12 +120,12 @@ class walk(object):
             self.sink_rates = [0]
 
             source_idx = np.argsort(sources[0])
-            self.source_sites = sources[0][source_idx]
-            self.source_rates = sources[1][source_idx]
+            self.source_sites = np.array(sources[0])[source_idx]
+            self.source_rates = np.array(sources[1])[source_idx]
 
             sink_idx = np.argsort(sinks[0])
-            self.sink_sites = sinks[0][sink_idx]
-            self.sink_rates = sinks[1][sink_idx]
+            self.sink_sites = np.array(sinks[0])[sink_idx]
+            self.sink_rates = np.array(sinks[1])[sink_idx]
 
         elif self.sink_sites is not None:
 
@@ -152,9 +156,9 @@ class walk(object):
         self.construct_superoperator()
 
     def construct_superoperator(self):
-        """A distributed superoperator is constructed on :class:`walk` initialization\
+        """A distributed :math:`\mathcal{L}` is constructed on :class:`walk` initialization\
                 or on calling :py:meth:`~freeqsw.MPI.walk.set_omega`. One-norms \
-                of the superoperator power series are calculated for using in \
+                of the :math:`\mathcal{L}` power series are calculated for using in \
                 deriving the optimal matrix exponentiation parameters when calling \
                 :py:meth:`~freeqsw.MPI.walk.step` and :py:meth:`~freeqsw.MPI.walk.series`.
                 """
@@ -245,12 +249,10 @@ class walk(object):
         self.one_norm_time = finish - start
 
     def set_omega(self, omega):
-        """Re-sets the interpolation paramater (:math:`\omega`) \
-            in the stochastic walk master equation. This triggers \
-            :py:func:`construct_superoperator`.
+        """Re-sets :math:`\omega` in the QSW master equation. This triggers :py:func:`construct_superoperator`.
 
-        :param omega: Must satisfy :math:`0 \geq \omega \leq 1`.
-        :type omega: numpy.real64
+        :param omega: :math:`\omega`
+        :type omega: float
         """
 
 
@@ -258,32 +260,20 @@ class walk(object):
         self.construct_superoperator()
 
     def initial_state(self, state, name = None):
-        """Sets the initial state of the density operator (:math:`\\rho`).
+        """Sets the initial state of :math:`\\rho(0)`.
 
-        :param state:
-        :type state: np.complex128 or str
+        :param state: One of the following:
 
-        Possible input are:
+            * (:math:`\\tilde{N}, \\tilde{N}`) or (N, N), complex,
 
-        * A 2D-array with shape equal to H.shape or shape equal to H.shape \
-                + the number of sources and sinks.
+            * :math:`\\tilde{N}` or N, complex,  Array describing the diagonal of :math:`\\rho(0)` with no inital inter-vertex coherences.
 
-        * A 1D-array with length equal to the diagonal of H or length equal to the \
-                diagonal of H + the number of sources and sinks. This describes an \
-                inital state with no coherences.
+            * 'sources' - Evenly distribute the initial state over all specified sources.
 
-        * 'sources' - evenly distribute the initial state over \
-                all specified sources.
+            * 'even' - Evenly distribute the initial state over all sites, including specified sources and sinks.
 
-        * 'even' - evenly distribute the initial state over all \
-                sites, including an specified sources and sinks.
-
-        If needed the array will be padded to match the shape of the system operators \
-                after the addtion of absorption and emission sites (sources and sinks).
-
-        :param name: An identifying name for the initial state, for use when saving \
-                or loading states from a .qsw file.
-        :type name: str, optional
+        :param name: An identifying name for the initial state, for use when saving or loading states from a .qsw file.
+        :type name: string, optional
         """
 
         self.initial_state_name = name
@@ -340,17 +330,14 @@ class walk(object):
     def File(self, filename, action = "a"):
         """Associate a .qsw file with the :class:`walk` object.
 
-        If the file does not exist it is created, otherwise it is \
-        checked for consistency with the system of the walk. This file \
-        may then be used to automatically save results obtained by \
-        :py:meth:`~freeqsw.MPI.walk.step` and :py:meth:`~freeqsw.MPI.walk.series`.
+        If the file does not exist it is created, otherwise it is checked for consistency with the system of the walk. This file \
+        may then be used to automatically save results obtained by :py:meth:`~freeqsw.MPI.walk.step` and :py:meth:`~freeqsw.MPI.walk.series`.
 
-        :param filename: Filename of the .qsw file, or filename of the .qsw \
-                to be created. It must end with a .qsw extension.
-        :type filename: str
+        :param filename: Filename of the .qsw file, or filename of the .qsw to be created. It must end with a .qsw extension.
+        :type filename: string
 
         :param action: "a", open or create file. "w" create file, overwrite if it already exists.
-        :type action: str
+        :type action: string
         """
 
         self.filename = str(filename)
@@ -367,25 +354,25 @@ class walk(object):
                     action)
 
     def step(self, t, target = None, save = False, name = None, precision = None):
-        """Calculate the state of the system at time t.
+        """Calculate :math:`\\rho(t)`.
 
-        :param t: The time, must statisfy :math:`0 \ge t`.
-        :type t: numpy.float64
+        :param t: time.
+        :type t: float
 
-        :param target: MPI rank to receive the calculated density operator, :math:`\\rho(t)`.
-        :type target: int, optional
+        :param target: MPI rank to receive :math:`\\rho(t)`.
+        :type target: integer, optional
 
         :param save: If True, save the result to an associated .qsw file.
-        :type save: True or False, optional
+        :type save: boolean, optional
 
         :param name: Name under which to save the result, if None it defaults to 'step + <sequential number>'.
-        :type name: str, optional
+        :type name: string, optional
 
         :param precision: Target precision, accepts "sp" for single precision and "dp" for double precision. Defaults to "dp".
-        :type precision: str, optional
+        :type precision: string, optional
 
         :return rhot: If **target** is specified the :math:`\\rho(t)` is returned to the target rank.
-        :rtype: numpy.complex128
+        :rtype: (:math:`\\tilde{N}, \\tilde{N}`), complex
 
         .. warning::
             At minimum a **target** must be specified, or **save** must be 'True'.
@@ -464,31 +451,32 @@ class walk(object):
 
             return rhot
 
-    def series(self, t1, t2, steps, target = None, save = False, name = None, precision = None, chunk_size = None):
-        """Calculate the state of the system over the time interval t1 to t2.
+    def series(self, t1, tq, steps, target = None, save = False, name = None, precision = None, chunk_size = None):
+        """Calculate :math:`\\rho(t)` over :math:`[t_1, t_q]` at :math:`q` evenly spaced steps.
 
-        :param t1: The starting time, must statisfy :math:`0 \ge t`.
-        :type t1: numpy.float64
+        :param t1: :math:`t_1`.
+        :type t1: float
 
-        :param t2: The ending time, must statisfy :math:`t1 \ge t2`.
-        :type t2: numpy.float64
+        :param tq: :math:`t_q`.
+        :type tq: float
 
-        :param steps: The number of evenly spaced points in time to calculate.
+        :param steps: :math:`q`.
+        :type steps: integer
 
-        :param target: MPI rank to receive the calculated density operator, :math:`\\rho(t)`.
-        :type target: int, optional
+        :param target: MPI rank to receive :math:`[\\rho(t_1),\\rho(t_2),...,\\rho(t_q)]`.
+        :type target: integer, optional
 
         :param save: If True, save the result to an associated .qsw file.
-        :type save: True or False, optional
+        :type save: boolean, optional
 
         :param name: Name under which to save the result, if None it defaults to 'series + <sequential number>'.
-        :type name: str, optional
+        :type name: string, optional
 
         :param precision: Target precision, accepts "sp" for single precision and "dp" for double precision. Defaults to "dp".
-        :type precision: str, optional
+        :type precision: string, optional
 
-        :return rhot: If **target** is specified the :math:`\\rho(t)` is returned to the target rank.
-        :rtype: numpy.complex128
+        :return rhot: If **target** is specified :math:`[\\rho(t_1),\\rho(t_2),...,\\rho(t_q)]` is returned to the target rank.
+        :rtype: (:math:`\\tilde{N}, \\tilde{N}`), complex, array
 
         .. warning::
             At minimum a **target** must be specified, or **save** must be 'True'.
@@ -500,19 +488,19 @@ class walk(object):
         if precision is None:
             precision = "dp"
 
-        if (chunk_size is None) and (save is False):
-            chunk_size = steps
-        elif (chunk_size is None) and (save is True):
-            chunk_size = np.rint(float(40**9)/(16*self.H.shape[0]**2))
-
         if (chunk_size is not None) and (save is False):
             chunk_size = steps
             if self.rank == 0:
                 warn('Chunked evaluation used only if save file is specified, defaulting to chunk_size=' + str(steps), UserWarning)
 
+        if (chunk_size is None) and (save is False):
+            chunk_size = steps
+        elif (chunk_size is None) and (save is True):
+            chunk_size = np.rint(float(40**9)/(16*self.H.shape[0]**2))
+
         chunks = int(np.ceil(steps/float(chunk_size)))
 
-        h = np.float32(t2 - t1)/np.float32(steps)
+        h = np.float32(tq - t1)/np.float32(steps)
         chunk_steps = chunk_size
 
         for i in range(0,chunks):
@@ -520,10 +508,10 @@ class walk(object):
             t1_chunk = i*chunk_size*h + t1
 
             if i == (chunks - 1):
-                t2_chunk = t2
-                chunk_steps = int(np.rint((t2_chunk - t1_chunk)/h))
+                tq_chunk = tq
+                chunk_steps = int(np.rint((tq_chunk - t1_chunk)/h))
             else:
-                t2_chunk = (i + 1)*chunk_size*h + t1
+                tq_chunk = (i + 1)*chunk_size*h + t1
 
             rhot_v_series = fMPI.series(
                     self.M_rows,
@@ -537,7 +525,7 @@ class walk(object):
                     self.M_local_col_inds,
                     self.M_rhs_send_inds,
                     t1_chunk,
-                    t2_chunk,
+                    tq_chunk,
                     self.rho_v,
                     chunk_steps,
                     self.partition_table,
@@ -577,7 +565,7 @@ class walk(object):
 
                     series.attrs['omega'] = self.omega
                     series.attrs['t1'] = t1
-                    series.attrs['t2'] = t2
+                    series.attrs['tq'] = tq
                     series.attrs['steps'] = steps
                     series.attrs['initial state'] = self.initial_state_name
                     series.attrs['initial state gen'] = self.initial_state_gen
@@ -619,3 +607,49 @@ class walk(object):
 
                     return rhot_series
 
+def load_system(filename, MPI_communicator):
+    """
+    Load :math:`H`, :math:`L`, sources and sinks stored in a .qsw file and distribute this over an MPI communicator.
+
+    :param filename: Name of the .qsw file.
+    :type filename: string
+
+    :param MPI_communicator: MPI communicator.
+
+    :return: :math:`H`, :math:`L`, sources and sinks.
+    :rtype: (N, N), complex; ([M], [M]), (integer, float), tuple; ([M], [M]), (integer, float), tuple.
+    """
+
+    rank = MPI_communicator.Get_rank()
+
+    if rank == 0:
+        system = io.File(str(io._qsw_extension(filename)))
+        H = system.H()
+        L = system.L()
+        sources = system.sources()
+        sinks = system.sinks()
+        size = H.shape[0]
+        system.close()
+    else:
+        size = None
+        system = None
+        sources = (None, None)
+        sinks = (None, None)
+
+    size = MPI_communicator.bcast(size, root = 0)
+    sources = MPI_communicator.bcast(sources, root=0)
+    sinks = MPI_communicator.bcast(sinks, root=0)
+
+    if rank != 0:
+        H = sp.csr_matrix((size,size), dtype = np.complex128)
+        L = sp.csr_matrix((size,size), dtype = np.complex128)
+
+    H.data = MPI_communicator.bcast(H.data, root = 0)
+    H.indices = MPI_communicator.bcast(H.indices, root = 0)
+    H.indptr = MPI_communicator.bcast(H.indptr, root = 0)
+
+    L.data = MPI_communicator.bcast(L.data, root = 0)
+    L.indices = MPI_communicator.bcast(L.indices, root = 0)
+    L.indptr = MPI_communicator.bcast(L.indptr, root = 0)
+
+    return H, L, sources, sinks
