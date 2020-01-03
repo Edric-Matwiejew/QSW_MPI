@@ -6,7 +6,6 @@ __pycache__
 *.npz
 *.mod
 *.o
-*.so
 *.txt
 *.npy
 *.dat
