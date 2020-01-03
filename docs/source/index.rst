@@ -1,21 +1,16 @@
-.. FreeQSW documentation master file, created by
-   sphinx-quickstart on Fri Aug 30 21:48:20 2019.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+QSW_MPI
+=======
+A framework for Quantum Stochastic Walk Simulation.
 
-Welcome to FreeQSW's documentation!
-===================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
    intro
-   freeqsw
-
-Indices and tables
-==================
+   theory
+   installation
+   usage_example
+   qsw_mpi
 
 * :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
