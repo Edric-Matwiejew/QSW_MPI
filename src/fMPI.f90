@@ -1,3 +1,19 @@
+!   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+!   Copyright (C) 2019 Edric Matwiejew
+!
+!   This program is free software: you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation, either version 3 of the License, or
+!   (at your option) any later version.
+!
+!   This program is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 subroutine  Super_Operator_Extent( omega, &
                             H_rows, &
                             H_nnz, &
@@ -65,12 +81,7 @@ subroutine  Super_Operator_Extent( omega, &
 
             allocate(source_sites_temp(n_sources))
 
-            !$omp parallel do
-            do i = 1, n_sources
-                source_sites_temp(i) = source_sites(i) + 1
-            enddo
-            !$omp end parallel do
-
+            source_sites_temp = source_sites + 1
             source_rates_temp => source_rates
 
         endif
@@ -82,12 +93,7 @@ subroutine  Super_Operator_Extent( omega, &
 
             allocate(sink_sites_temp(n_sinks))
 
-            !$omp parallel do
-            do i = 1, n_sinks
-                sink_sites_temp(i) = sink_sites(i) + 1
-            enddo
-            !$omp end parallel do
-
+            sink_sites_temp = sink_sites + 1
             sink_rates_temp => sink_rates
 
         endif
@@ -99,23 +105,9 @@ subroutine  Super_Operator_Extent( omega, &
         H%rows = H_rows
         H%columns = H_rows
 
-        !$omp parallel do
-        do i = 1, H_rows + 1
-            H%row_starts(i) = H_row_starts(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, H_nnz
-            H%col_indexes(i) = H_col_indexes(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, H_nnz
-            H%values(i) = H_values(i)
-        enddo
-        !$omp end parallel do
+        H%row_starts = H_row_starts + 1
+        H%col_indexes = H_col_indexes + 1
+        H%values = H_values
 
         allocate(L%row_starts(H_rows + 1))
         allocate(L%col_indexes(L_nnz))
@@ -124,23 +116,9 @@ subroutine  Super_Operator_Extent( omega, &
         L%rows = H_rows
         L%columns = H_rows
 
-        !$omp parallel do
-        do i = 1, H_rows + 1
-            L%row_starts(i) = L_row_starts(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, L_nnz
-            L%col_indexes(i) = L_col_indexes(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, L_nnz
-            L%values(i) = L_values(i)
-        enddo
-        !$omp end parallel do
+        L%row_starts = L_row_starts + 1
+        L%col_indexes = L_col_indexes + 1
+        L%values = L_values
 
         call Prepare_Super_Operator(    omega, &
                                         H, &
@@ -236,12 +214,7 @@ subroutine  Super_Operator( omega, &
 
             allocate(source_sites_temp(n_sources))
 
-            !$omp parallel do
-            do i = 1, n_sources
-                source_sites_temp(i) = source_sites(i) + 1
-            enddo
-            !$omp end parallel do
-
+            source_sites_temp = source_sites + 1
             source_rates_temp => source_rates
 
         endif
@@ -253,12 +226,7 @@ subroutine  Super_Operator( omega, &
 
             allocate(sink_sites_temp(n_sinks))
 
-            !$omp parallel do
-            do i = 1, n_sinks
-                sink_sites_temp(i) = sink_sites(i) + 1
-            enddo
-            !$omp end parallel do
-
+            sink_sites_temp = sink_sites + 1
             sink_rates_temp => sink_rates
 
         endif
@@ -269,24 +237,9 @@ subroutine  Super_Operator( omega, &
 
         H%rows = H_rows
         H%columns = H_rows
-
-        !$omp parallel do
-        do i = 1, H_rows + 1
-            H%row_starts(i) = H_row_starts(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, H_nnz
-            H%col_indexes(i) = H_col_indexes(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, H_nnz
-            H%values(i) = H_values(i)
-        enddo
-        !$omp end parallel do
+        H%row_starts = H_row_starts + 1
+        H%col_indexes = H_col_indexes + 1
+        H%values = H_values
 
         allocate(L%row_starts(H_rows + 1))
         allocate(L%col_indexes(L_nnz))
@@ -294,24 +247,9 @@ subroutine  Super_Operator( omega, &
 
         L%rows = H_rows
         L%columns = H_rows
-
-        !$omp parallel do
-        do i = 1, H_rows + 1
-            L%row_starts(i) = L_row_starts(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, L_nnz
-            L%col_indexes(i) = L_col_indexes(i) + 1
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, L_nnz
-            L%values(i) = L_values(i)
-        enddo
-        !$omp end parallel do
+        L%row_starts = L_row_starts + 1
+        L%col_indexes = L_col_indexes + 1
+        L%values = L_values
 
         call Prepare_Super_Operator(    omega, &
                                         H, &
@@ -622,11 +560,9 @@ subroutine initial_state(   rho0_rows, &
                             rho0_v_temp, &
                             MPI_communicator)
 
-    !$omp parallel do
     do i = 1, M_local_rows
         rho0_v(i) = rho0_v_temp(i + partition_table(rank + 1) - 1)
     enddo
-    !$omp end parallel do
 
 end subroutine initial_state
 

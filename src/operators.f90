@@ -116,7 +116,7 @@ module Operators
 
     subroutine Symmetrise_Graph_Weights(A, values)
 
-        type(CSR), intent(inout) :: A !< Structurally symmetric CSR array.
+        type(CSR), intent(inout) :: A !< @param Structurally symmetric CSR array.
         complex(dp), dimension(:), intent(inout) :: values !< @param Symmetrised values array
 
         integer, dimension(:), allocatable :: offset
@@ -151,10 +151,19 @@ module Operators
 
     end subroutine Symmetrise_Graph_Weights
 
+    !
+    !   Subroutine: Generate_Scattering_Lindblad_Operators
+    !
+    !>  @brief Construct a QSW Lindblad operator matrix.
+    !
+    !>  @details Given a CSR transition matrix A this subroutine constructs
+    !>  a CSR matrix representing the single-valued Lindblad operator matricies
+    !>  as a linear sum.
+
     subroutine Generate_Scattering_Lindblad_Operators(A, L)
 
-        type(CSR), intent(in) :: A
-        type(CSR), intent(out) :: L
+        type(CSR), intent(in) :: A !< @param CSR array.
+        type(CSR), intent(out) :: L !< @param CSR array.
 
         integer, dimension(:), allocatable :: row_offsets
 
@@ -186,11 +195,18 @@ module Operators
 
     end subroutine Generate_Scattering_Lindblad_Operators
 
+    !
+    !   Subroutine: Generate_Scattering_Superoperator
+    !
+    !>  @brief: Given a CSR Lindblad operator matrix, lower row partition bound
+    !>  and upper row parition bound, a section of a super-operator describing
+    !>  a continuous time random walk (CTRW) is constructed.
+
     subroutine Generate_Scattering_Superoperator(L, lower_bound, upper_bound, B)
 
-        type(CSR), intent(in) :: L
-        integer, intent(in) :: upper_bound, lower_bound
-        type(CSR), intent(out) :: B
+        type(CSR), intent(in) :: L !< @param CSR array.
+        integer, intent(in) :: upper_bound, lower_bound !< @param lower and upper bounds of the super-operator slice.
+        type(CSR), intent(out) :: B !< @param CTRW super-operator row slice.
 
         integer :: lower_block, upper_block
         complex(dp), dimension(:), allocatable :: value_elements
@@ -210,7 +226,7 @@ module Operators
         allocate(nz_diag(L%rows))
 
         value_elements = 0
-        nz_diag(i) = 0
+        nz_diag = 0
 
         do i = 1, L%rows
             do j = L%row_starts(i), L%row_starts(i + 1) - 1
@@ -256,7 +272,7 @@ module Operators
         allocate(value_elements_shifted(0:L%rows - 1))
 
         value_elements_shifted(0) = value_elements(L%rows)
-        value_elements_shifted(1:L%rows - 1) = value_elements(i)
+        value_elements_shifted(1:L%rows - 1) = value_elements(1:L%rows - 1)
 
         lower_offset = (lower_bound - (lower_block - 1)*L%rows) - 1
         upper_offset = (upper_bound - (upper_block - 1)*L%rows) - L%rows
@@ -311,14 +327,21 @@ module Operators
 
     end subroutine Generate_Scattering_Superoperator
 
+    !
+    !   Subroutine: Generate_Coherent_Superoperator
+    !
+    !>  @brief Given a graph Hamiltonian H, lower row bound and upper row bound,
+    !>  a row-slice of a super-operator describing a continous time quantum walk
+    !>  is constructed.
+
     subroutine Generate_Coherent_Superoperator( H, &
                                                 lower_bound, &
                                                 upper_bound, &
                                                 B)
 
-        type(CSR), intent(in) :: H
-        integer, intent(in) :: lower_bound, upper_bound
-        type(CSR), intent(out) :: B
+        type(CSR), intent(in) :: H !< @param Graph Hamiltonian.
+        integer, intent(in) :: lower_bound, upper_bound !< @param Upper and lower row bounds
+        type(CSR), intent(out) :: B !< @param CTWQ super-operator row-slice.
 
         integer :: lower_block, upper_block
 
@@ -421,11 +444,20 @@ module Operators
 
     end subroutine Generate_Coherent_Superoperator
 
+    !
+    !   Subroutine: Generate_Graph_Hamiltonian
+    !
+    !>  @brief Generate a transition matrix from a graph adjacency matrix.
+    !
+    !>  @details Given the transition rate, gamma, and adjacency matrix, A,
+    !>  this constructs a graph transition matrix. If A is non-symmetric the
+    !>  transition matrix, B, will also be non-symmetric.
+
     subroutine Generate_Graph_Hamiltonian(gamma, A, B)
 
-        real(dp), intent(in) :: gamma
-        type(CSR), intent(in) :: A
-        type(CSR), intent(out) :: B
+        real(dp), intent(in) :: gamma !< @param System-wide transition rate.
+        type(CSR), intent(in) :: A !< @param Graph adjacency matrix.
+        type(CSR), intent(out) :: B !< @param Transition matrix.
 
         complex(dp), dimension(A%rows) :: out_degrees
 
@@ -442,25 +474,15 @@ module Operators
         B%rows = A%rows
         B%columns = A%columns
 
-        !$omp parallel do
-        do i = 1, A%rows
-            out_degrees(i) = 0
-        enddo
-        !$omp end parallel do
+        out_degrees = 0
 
-        !$omp parallel do reduction(+:out_degrees)
         do i = 1, A%rows
             do j = A%row_starts(i), A%row_starts(i + 1) - 1
                 out_degrees(i) = out_degrees(i) + gamma*A%values(j)
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do
-        do i = 1, A%rows + 1
-            B%row_starts(i) = A%row_starts(i)
-        enddo
-        !$omp end parallel do
+        B%row_starts = A%row_starts
 
         do i = 1, A%rows
             if (abs(out_degrees(i)) > epsilon(0.d0)) then
@@ -473,7 +495,6 @@ module Operators
         allocate(B%col_indexes(nnz))
         allocate(B%values(nnz))
 
-        !$omp parallel do private(elements)
         do i = 1, B%rows
 
             elements = A%row_starts(i + 1) - A%row_starts(i)
@@ -491,9 +512,7 @@ module Operators
             B%values(B%row_starts(i + 1) - 1) = out_degrees(i)
 
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(i, temp, temp_indx, j)
         do k = 1, B%rows
             do i = B%row_starts(k) + 1, B%row_starts(k + 1) - 1
                 temp = B%values(i)
@@ -509,9 +528,18 @@ module Operators
                 B%col_indexes(j + 1) = temp_indx
             enddo
         enddo
-        !$omp end parallel do
 
     end subroutine Generate_Graph_Hamiltonian
+
+    !   Subroutine: Generate_Stochastic_Superoperator
+    !
+    !>  @bried: Construct a row-slice of a super-operator describing a
+    !>  Quantum Stochastic Walk (QSW).
+    !
+    !>  @details Given a symmetric graph transition matrix, H, a QSW Lindblad
+    !>  operator matrix, L, decoherence parameter, omega, lower row bound and
+    !>  upper row bound, this constructs a row-slice of a super-operator describing
+    !>  a QSW.
 
     subroutine Generate_Stochastic_Superoperator(H, &
                                     L, &
@@ -520,10 +548,10 @@ module Operators
                                     upper_bound, &
                                     B)
 
-        type(CSR), intent(in) :: H, L
-        real(dp), intent(in) :: omega
-        integer, intent(in) :: lower_bound, upper_bound
-        type(CSR), intent(out) :: B
+        type(CSR), intent(in) :: H, L !< @param Transition matrix and Lindblad operator matrix.
+        real(dp), intent(in) :: omega !< @param Decoherence parameter.
+        integer, intent(in) :: lower_bound, upper_bound !< @param Upper and lower bounds for the row-slice.
+        type(CSR), intent(out) :: B !< @ QSW super-operator row-slice.
 
         integer :: lower_block, upper_block
 
@@ -539,11 +567,6 @@ module Operators
 
         integer :: N
 
-        !sort
-        !complex(dp) :: temp
-        !integer :: temp_indx
-        !integer :: k
-
         N = H%rows
 
         lower_block = ceiling(real(lower_bound)/H%rows)
@@ -558,55 +581,15 @@ module Operators
         allocate(out_degrees(N))
         allocate(diag_vals(N**2))
 
-        !$omp parallel do
-        do i = 1, N
-            H_left = 0
-        enddo
-        !$omp end parallel do
+        H_left = 0
+        H_right = 0
+        L_left = 0
+        L_right = 0
+        H_diag_vals = 0
+        L_diag_vals = 0
+        out_degrees = 0
+        diag_vals = 0
 
-        !$omp parallel do
-        do i = 1, N
-            H_right(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            L_left(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            L_right(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            H_diag_vals(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            L_diag_vals(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            out_degrees(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, H%rows**2
-            diag_vals(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do private(j)
         do i = 1, N
             do j = H%row_starts(i), H%row_starts(i + 1) - 1
                 if (H%col_indexes(j) < i) then
@@ -618,9 +601,7 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(j)
         do i = 1, L%rows
             do j = L%row_starts(i), L%row_starts(i + 1) - 1
                 if (L%col_indexes(j) < i) then
@@ -632,30 +613,23 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do reduction(+:out_degrees)
         do i = 1, size(L%values, 1)
             out_degrees(L%col_indexes(i)) = out_degrees(L%col_indexes(i)) + &
                 omega*L%values(i)*conjg(L%values(i))
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(row)
         do i = 1, N
            row = (i - 1)*N + i
             diag_vals(row) = omega*L_diag_vals(i)*conjg(L_diag_vals(i))
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(j, row)
         do i = 1, N
              do j = 1, N
                 row = (i - 1)*N + j
                 diag_vals(row) = diag_vals(row) - 0.5_dp*(out_degrees(i) + out_degrees(j))
             enddo
         enddo
-        !$omp end parallel do
 
         do i = 1, N
             diag_vals((i - 1)*N + 1:i*N) = &
@@ -665,14 +639,8 @@ module Operators
         allocate(row_start(N**2 + 1))
 
         row_start(1) = 1
+        row_start(2:N**2 + 1) = 0
 
-        !$omp parallel do
-        do i = 2, N**2 + 1
-            row_start(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do private(row, j)
         do i = 1, N
             row = (i - 1)*N + i
             row_start(row + 1) = row_start(row + 1) + L%row_starts(i + 1) - L%row_starts(i)
@@ -691,7 +659,6 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         call Prefix_Sum(row_start)
 
@@ -701,7 +668,6 @@ module Operators
         lower_offset = (lower_bound -(lower_block - 1)*N) - 1
         upper_offset = (upper_bound - (upper_block - 1)*N) - N
 
-        !$omp parallel do private(j, row, lower_indx, upper_indx)
         do i = lower_block, upper_block
             do j = 1 + Kronecker_Delta(lower_block, i)*lower_offset, N + &
                 Kronecker_Delta(upper_block, i)*upper_offset
@@ -781,7 +747,6 @@ module Operators
             enddo
 
         enddo
-        !$omp end parallel do
 
         allocate(B%row_starts(lower_bound:upper_bound + 1))
 
@@ -794,6 +759,18 @@ module Operators
 
     end subroutine Generate_Stochastic_Superoperator
 
+    !
+    !   Subroutine: Add_Sources_and_Sinks
+    !
+    !>  @brief Add scattering channels to the Lindblad operator matrix, L, to
+    !>  model absorption and emission processes.
+    !
+    !>  @details Given Lindblad operator matrix, L, sources sites/rates and
+    !>  sink sites/rates, this outputs an augmented Lindblad operator of dimension
+    !>   N + m, where N is the dimension of L and m is the number of sources and
+    !>  sinks, describing absorption and emission from the underlying graph
+    !>  structure.
+
     subroutine Add_Sources_and_Sinks(   L, &
                                         L_aug, &
                                         source_sites, &
@@ -801,12 +778,12 @@ module Operators
                                         sink_sites, &
                                         sink_rates)
 
-        type(CSR), intent(in) :: L
-        type(CSR), intent(out) :: L_aug
-        integer, dimension(:), optional :: source_sites
-        real(dp), dimension(:), optional :: source_rates
-        integer, dimension(:), optional :: sink_sites
-        real(dp), dimension(:), optional :: sink_rates
+        type(CSR), intent(in) :: L !< @param Lindblad operator matrix.
+        type(CSR), intent(out) :: L_aug !< @param Augmented Lindblad operator matrix.
+        integer, dimension(:), optional :: source_sites !< @param Graph nodes to which a source is attached.
+        real(dp), dimension(:), optional :: source_rates !< @param Transition rates of the attached sources.
+        integer, dimension(:), optional :: sink_sites !< @param Graph nodes to which a sink is attached.
+        real(dp), dimension(:), optional :: sink_rates !< @param Transition rates of the attached sinks.
 
         integer :: n_sources
         integer :: n_sinks
@@ -835,19 +812,10 @@ module Operators
         L_aug%rows = L%rows + n_sinks + n_sources
         L_aug%columns = L_aug%rows + n_sinks + n_sources
 
-        !$omp parallel do
-        do i = 1, L%rows + 1
-            L_aug%row_starts(i) = L%row_starts(i)
-        enddo
-        !$omp end parallel do
-
+        L_aug%row_starts(1:L%rows + 1) = L%row_starts(1:L%rows + 1)
         L_aug%row_starts(L%rows + 2:L_aug%rows + 1) = L%row_starts(L%rows + 1)
 
-        !$omp parallel do
-        do i = 1, size(L_aug%col_indexes)
-            L_aug%col_indexes(i) = 0
-        enddo
-        !$omp end parallel do
+        L_aug%col_indexes = 0
 
         indx = 1
         do i = 1, n_sources
@@ -880,7 +848,6 @@ module Operators
 
         enddo
 
-        !$omp parallel do private(elements)
         do i = 1, L%rows
 
             elements = L%row_starts(i + 1) - L%row_starts(i)
@@ -892,9 +859,7 @@ module Operators
                 L%values(L%row_starts(i):L%row_starts(i + 1) - 1)
 
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(i, temp, temp_indx, j)
         do k = 1, L_aug%rows
             do i = L_aug%row_starts(k) + 1, L_aug%row_starts(k + 1) - 1
                 temp = L_aug%values(i)
@@ -910,12 +875,22 @@ module Operators
                 L_aug%col_indexes(j + 1) = temp_indx
             enddo
         enddo
-        !$omp end parallel do
 
     end subroutine Add_Sources_and_Sinks
 
+    !
+    !   Subroutine: Transport_Lindblads
+    !
+    !>  @brief Creates a Lindblad operator matrix containing only absorption and
+    !>  emission channels.
+    !
+    !>  @detail For the case of a CTQW incorperating absorption and emission
+    !>  this creates a Lindblad operator matrix containing only these scattering
+    !>  channels.
+    !
     ! NOTE: The sink and site variables are mixed up in this subroutine.
     ! as a quick fix I have swappwed them as input arguments.
+
     subroutine Transport_Lindblads( N, &
                                     sink_sites, &
                                     sink_rates, &
@@ -923,12 +898,12 @@ module Operators
                                     source_rates, &
                                     L_inout)
 
-        integer, intent(in) :: N
-        integer, dimension(:), intent(in) :: source_sites
-        real(dp), dimension(:), intent(in) :: source_rates
-        integer, dimension(:), intent(in) :: sink_sites
-        real(dp), dimension(:), intent(in) :: sink_rates
-        type(CSR), intent(out) :: L_inout
+        integer, intent(in) :: N !< @param Dimension of the graph adjacency matrix.
+        integer, dimension(:), intent(in) :: source_sites !< @param Graph nodes to which a source is attached.
+        real(dp), dimension(:), intent(in) :: source_rates !< @param Transition rates of the attached sources.
+        integer, dimension(:), intent(in) :: sink_sites !< @param Graph nodes to which a sink is attached.
+        real(dp), dimension(:), intent(in) :: sink_rates !< @param Transition rates of the attached sinks.
+        type(CSR), intent(out) :: L_inout !< @param Lindblad operator matrix describing only absorption and esmission processes.
 
         integer :: augs
 
@@ -949,12 +924,7 @@ module Operators
         L_inout%col_indexes(size(sink_sites) + 1: augs) = source_sites
         L_inout%values(size(sink_sites) + 1: augs) = sqrt(abs(source_rates))
 
-        !$omp parallel do
-        do i = 2, L_inout%rows + 1
-            L_inout%row_starts(i) = 0
-        enddo
-        !$omp end parallel do
-
+        L_inout%row_starts(2:L_inout%rows + 1) = 0
         L_inout%row_starts(1) = 1
 
         do i = 1, size(sink_sites)
@@ -969,15 +939,26 @@ module Operators
 
     end subroutine Transport_Lindblads
 
+    !
+    !   Subroutine: Generate_Coherent_Transport_Superoperator
+    !
+    !>  @brief Generate a super-operator slice describing a continous-time
+    !>  quantum walk including absorption an emssion processes.
+    !
+    !>  @detail Given a symmetric graph transition matrix H, a Lindblad operator
+    !>  matrix containing only absorption and emission channels, lower row bound,
+    !>  and upper row bound, a row slice of a super-operator describing a CTQW
+    !>  including absorption and emission processes is constructed.
+
     subroutine Generate_Coherent_Transport_Superoperator(H, &
                                     L, &
                                     lower_bound, &
                                     upper_bound, &
                                     B)
 
-        type(CSR), intent(in) :: H, L
-        integer, intent(in) :: lower_bound, upper_bound
-        type(CSR), intent(out) :: B
+        type(CSR), intent(in) :: H, L !< @param Symmetric graph transition matrix and Lindblad operator matrix.
+        integer, intent(in) :: lower_bound, upper_bound !< @param lower and upper row bounds of the super-operator slice.
+        type(CSR), intent(out) :: B !< @param Super-operator row slice.
 
         integer :: lower_block, upper_block
 
@@ -993,11 +974,6 @@ module Operators
 
         integer :: N
 
-        !sort
-        !complex(dp) :: temp
-        !integer :: temp_indx
-        !integer :: k
-
         N = H%rows
 
         lower_block = ceiling(real(lower_bound)/H%rows)
@@ -1012,55 +988,15 @@ module Operators
         allocate(out_degrees(N))
         allocate(diag_vals(N**2))
 
-        !$omp parallel do
-        do i = 1, N
-            H_left = 0
-        enddo
-        !$omp end parallel do
+        H_left = 0
+        H_right = 0
+        L_left = 0
+        L_right = 0
+        H_diag_vals = 0
+        L_diag_vals = 0
+        out_degrees = 0
+        diag_vals = 0
 
-        !$omp parallel do
-        do i = 1, N
-        H_right(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            L_left(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            L_right(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            H_diag_vals(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            L_diag_vals(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, N
-            out_degrees(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do
-        do i = 1, H%rows**2
-            diag_vals(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do private(j)
         do i = 1, N
             do j = H%row_starts(i), H%row_starts(i + 1) - 1
                 if (H%col_indexes(j) < i) then
@@ -1072,9 +1008,7 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(j)
         do i = 1, L%rows
             do j = L%row_starts(i), L%row_starts(i + 1) - 1
                 if (L%col_indexes(j) < i) then
@@ -1086,49 +1020,34 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do reduction(+:out_degrees)
         do i = 1, size(L%values, 1)
             out_degrees(L%col_indexes(i)) = out_degrees(L%col_indexes(i)) + &
                 L%values(i)*conjg(L%values(i))
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(row)
         do i = 1, N
            row = (i - 1)*N + i
             diag_vals(row) = L_diag_vals(i)*conjg(L_diag_vals(i))
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do private(row)
         do i = 1, N
              do j = 1, N
                 row = (i - 1)*N + j
                 diag_vals(row) = diag_vals(row) - 0.5_dp*(out_degrees(i) + out_degrees(j))
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do
         do i = 1, N
             diag_vals((i - 1)*N + 1:i*N) = &
                 diag_vals((i - 1)*N + 1:i*N) + H_diag_vals - H_diag_vals(i)
         enddo
-        !$omp end parallel do
 
         allocate(row_start(N**2 + 1))
 
         row_start(1) = 1
+        row_start(2:N**2 + 1) = 0
 
-        !$omp parallel do
-        do i = 2, N**2 + 1
-            row_start(i) = 0
-        enddo
-        !$omp end parallel do
-
-        !$omp parallel do private(row, j)
         do i = 1, N
             row = (i - 1)*N + i
             row_start(row + 1) = row_start(row + 1) + L%row_starts(i + 1) - L%row_starts(i)
@@ -1147,7 +1066,6 @@ module Operators
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         call Prefix_Sum(row_start)
 
@@ -1157,7 +1075,6 @@ module Operators
         lower_offset = (lower_bound -(lower_block - 1)*N) - 1
         upper_offset = (upper_bound - (upper_block - 1)*N) - N
 
-        !$omp parallel do private (j, row, lower_indx, upper_indx)
         do i = lower_block, upper_block
             do j = 1 + Kronecker_Delta(lower_block, i)*lower_offset, N + &
                 Kronecker_Delta(upper_block, i)*upper_offset
@@ -1237,15 +1154,10 @@ module Operators
             enddo
 
         enddo
-        !$omp end parallel do
 
         allocate(B%row_starts(lower_bound:upper_bound + 1))
 
-        !$omp parallel do
-        do i = lower_bound, upper_bound + 1
-            B%row_starts(i) = row_start(i)
-        enddo
-        !$omp end parallel do
+        B%row_starts(lower_bound:upper_bound + 1) = row_start(lower_bound:upper_bound + 1)
 
         B%rows = upper_bound - lower_bound + 1
         B%columns = H%columns**2
@@ -1253,6 +1165,18 @@ module Operators
         call Sort_CSR(B)
 
     end subroutine Generate_Coherent_Transport_Superoperator
+
+    !
+    !   Subroutine: Prepare_Super_Operator
+    !
+    !>  @brief Construct and arbitrary super-operator row slice.
+    !
+    !>  @details Given decoherence parameter omega, transition matrix H,
+    !>  Lindblad operator matrix L, source sites/rates, sink sites/rates and an
+    !>  array describing the desired partitioning of the super-operator over a
+    !>  MPI communicator, this determines which super-operator construction
+    !>  subroutine is appropriate and provides a super-operator row-slice using
+    !>  that subroutine.
 
     subroutine Prepare_Super_Operator(  omega, &
                                         H, &
@@ -1265,16 +1189,16 @@ module Operators
                                         M_local, &
                                         MPI_communicator)
 
-        real(dp), intent(in) :: omega
-        type(CSR), intent(in) :: H
-        type(CSR), intent(in) :: L
-        integer, dimension(:), intent(in) :: source_sites
-        real(dp), dimension(:), intent(in) :: source_rates
-        integer, dimension(:), intent(in) :: sink_sites
-        real(dp), dimension(:), intent(in) :: sink_rates
-        integer, dimension(:), allocatable, intent(out) :: partition_table
-        type(CSR), intent(out) :: M_local
-        integer, intent(in) :: MPI_communicator
+        real(dp), intent(in) :: omega !< @param Decoherence parameter.
+        type(CSR), intent(in) :: H !< @param Transition matrix.
+        type(CSR), intent(in) :: L !< @param Lindblad operator matrix.
+        integer, dimension(:), intent(in) :: source_sites !< @param Graph vertices to which a source is attached.
+        real(dp), dimension(:), intent(in) :: source_rates !< @oaram Transition rates of the attached sources.
+        integer, dimension(:), intent(in) :: sink_sites !< @param Graph vertices to which a sink is attached.
+        real(dp), dimension(:), intent(in) :: sink_rates !< @param Transition rates of the attached sinks.
+        integer, dimension(:), allocatable, intent(out) :: partition_table !< @param row-slice paritioning of the super-operator over an MPI communicator.
+        type(CSR), intent(out) :: M_local !< @param Super-operator row-slice.
+        integer, intent(in) :: MPI_communicator !< @param MPI communicator over which the super-operator will be constructed.
 
         integer :: L_bound
         integer :: U_bound
@@ -1401,15 +1325,24 @@ module Operators
 
     end subroutine Prepare_Super_Operator
 
+    !
+    !   Subroutine: Vectorize_Operator
+    !
+    !>  @brief Vectorise a N x N operator.
+    !
+    !>  @details Given a dense operator O, the subroutine vectorizes the operator
+    !>  such that its vectorized for is distributed over a MPI communicator row-wise
+    !>  as described by partition_table.
+
     subroutine Vectorize_Operator(  O, &
                                     partition_table, &
                                     O_v, &
                                     MPI_communicator)
 
-        complex(dp), dimension(:, :), intent(in) :: O
-        integer, dimension(:), intent(in) :: partition_table
-        complex(dp), dimension(:), allocatable, intent(out) :: O_v
-        integer, intent(in) :: MPI_communicator
+        complex(dp), dimension(:, :), intent(in) :: O !< @param N x N operator.
+        integer, dimension(:), intent(in) :: partition_table !< @param Row-wise partitioning of the vectorized operator.
+        complex(dp), dimension(:), allocatable, intent(out) :: O_v !< @param Local partition of the vectorized operator.
+        integer, intent(in) :: MPI_communicator !< @param MPI communicator over which the vectorized operator is to be distributed.
 
         integer :: O_size
 
@@ -1442,7 +1375,6 @@ module Operators
         L_shift = L_bound - (L_row - 1)*O_size - 1
         U_shift = U_row*O_size - (U_bound)
 
-        !$omp parallel do private(j, indx)
         do i = L_row, U_row
 
             do j = 1 + Kronecker_Delta(i, L_row)*L_shift, &
@@ -1455,14 +1387,19 @@ module Operators
             enddo
 
         enddo
-        !$omp end parallel do
 
     end subroutine Vectorize_Operator
 
+    !
+    !   Subroutine: Reshape_Vectorized_Operator_Series
+    !
+    !>  @breif Reshape a series resulting from a vectorized operator of dimension
+    !>  N^2 into a series consisting of N x N matrices.
+
     subroutine Reshape_Vectorized_Operator_Series( O_v_series, O_series)
 
-        complex(dp), dimension(:,:), intent(in) :: O_v_series
-        complex(dp), dimension(:, :, :), intent(out) :: O_series
+        complex(dp), dimension(:,:), intent(in) :: O_v_series !< @param Vectorized operator series.
+        complex(dp), dimension(:, :, :), intent(out) :: O_series !< @param reshaped operator series.
 
         integer :: O_dim
         integer :: steps
@@ -1473,7 +1410,6 @@ module Operators
         steps = size(O_v_series, 2)
 
 
-        !$omp parallel do private(i, j, indx)
         do k = 1, steps
             do i = 1, O_dim
                 do j = 1, O_dim
@@ -1482,14 +1418,18 @@ module Operators
                 enddo
             enddo
         enddo
-        !$omp end parallel do
 
     end subroutine Reshape_Vectorized_Operator_Series
 
+    !
+    !   Subroutine: Reshape_Vectorized_Operator
+    !
+    !>  @brief Rehape a vectorized operator of dimension N^2 into a N x N matrix.
+
     subroutine Reshape_Vectorized_Operator( O_v, O)
 
-        complex(dp), dimension(:), intent(in) :: O_v
-        complex(dp), dimension(:, :), intent(out) :: O
+        complex(dp), dimension(:), intent(in) :: O_v !< @param Vectorized operator.
+        complex(dp), dimension(:, :), intent(out) :: O !< @param Reshaped operator.
 
         integer :: O_dim
         integer :: i, j
@@ -1497,14 +1437,12 @@ module Operators
 
         O_dim = int(sqrt(real(size(O_v))))
 
-        !$omp parallel do private(j, indx)
         do i = 1, O_dim
             do j = 1, O_dim
                 indx = (i - 1)*O_dim + j
                 O(i, j) = O_v(indx)
             enddo
         enddo
-        !$omp end parallel do
 
     end subroutine Reshape_Vectorized_Operator
 

@@ -1,7 +1,33 @@
-! Module: Linalg_Expm
+!   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+!   Copyright (C) 2019 Edric Matwiejew
 !
-!> @brief Action of the complex matrix exponential on a vector.
+!   This program is free software: you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation, either version 3 of the License, or
+!   (at your option) any later version.
 !
+!   This program is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+!   Module: Expm
+!
+!>  @brief Action of the complex matrix exponential on a vector parallalized 
+!>  using MPI.
+!
+!>  @deatils This module implements Algorithms 3.2 and 5.2 as described in
+!>  "Computing the action of the matrix exponential with an application to
+!>  exponential integrators" by Awad H. Al-Mohy and Nicholas J, Higham,
+!>  DOI: 10.1137/100788860.
+
+!>  @note There are two omissions. Firstly, optional balancing of the input 
+!>  matrix is not included. Secondly, the norm of the input matrix is not
+!>  minimised via reduction of the Frobenius norm.
+
 module Expm
 
     use :: ISO_Precisions
@@ -74,7 +100,6 @@ module Expm
             Infinity_Norm = 0
         endif
 
-        !$omp parallel do
         do i = 2, size(B)
 
             if (abs(B(i)) > Infinity_Norm) then
@@ -84,7 +109,6 @@ module Expm
             endif
 
         enddo
-        !$omp end parallel do
 
         call MPI_allreduce( Infinity_Norm, &
                             inf_reduce, &
@@ -122,7 +146,7 @@ module Expm
         type(CSR) :: A_T
 
         real(dp), dimension(2:p_max + 1) :: A_norms
-        integer(qp), dimension(:), allocatable :: c_array !! should calculated and allocate to allow for different p values
+        integer(qp), dimension(:), allocatable :: c_array
         real(dp), dimension(2:p_max) :: alpha_array
 
         integer :: itmax, min_c
@@ -431,7 +455,7 @@ module Expm
         allocate(B_temp_1(lb:ub))
         allocate(B_temp_2(lb:ub))
 
-        if (t == 0) then
+        if (abs(t) < epsilon(t)) then
             m_star = 0
             s = 1
         else
@@ -475,19 +499,13 @@ module Expm
         allocate(A_temp%values(A%row_starts(partition_table(rank + 1)): &
             A%row_starts(partition_table(rank + 2)) - 1))
 
-        !$omp parallel do
         do i = A%row_starts(lbound(A%row_starts, 1)), &
                 A%row_starts(ubound(A%row_starts, 1)) - 1
             A_temp%values(i) = t*A%values(i)
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do
-        do i = lb, ub
-            B_temp_1(i) = B(i)
-            C(i) = B(i)
-        enddo
-        !$omp end parallel do
+        B_temp_1(lb:ub) = B(lb:ub)
+        C(lb:ub) = B(lb:ub)
 
         do i = 1, s
 
@@ -505,43 +523,25 @@ module Expm
                                     B_temp_2, &
                                     mpi_communicator)
 
-                !$omp parallel do
-                do k = lb, ub
-                    B_temp_2(k) = B_temp_2(k)/real(s*j, dp)
-                enddo
-                !$omp end parallel do
+                B_temp_2(lb:ub) = B_temp_2(lb:ub)/real(s*j, dp)
 
                 c_2 = Infinity_Norm(B_temp_2, MPI_communicator)
 
 
-                !$omp parallel do
-                do k = lb, ub
-                    C(k) = C(k) + B_temp_2(k)
-                enddo
-                !$omp end parallel do
+                C(lb:ub) = C(lb:ub) + B_temp_2(lb:ub)
 
                 if ((c_1 + c_2) <= &
                     (tol*Infinity_Norm(C, MPI_communicator))) then
-
                     exit
-
                 endif
 
-                !$omp parallel do
-                do k = lb, ub
-                    B_temp_1(k) = B_temp_2(k)
-                enddo
-                !$omp end parallel do
+                B_temp_1(lb:ub) = B_temp_2(lb:ub)
 
                 c_1 = c_2
 
             enddo
 
-            !$omp parallel do
-            do k = lb, ub
-                B_temp_1(k) = C(k)
-            enddo
-            !$omp end parallel do
+            B_temp_1(lb:ub) = C(lb:ub)
 
         enddo
 
@@ -604,8 +604,6 @@ module Expm
         integer :: ierr
 
         integer :: i, kay, indx, lb, ub
-
-        integer :: ii
 
         call mpi_comm_rank(MPI_communicator, rank, ierr)
 
@@ -695,11 +693,7 @@ module Expm
                     one_norm_series = one_norm_series, &
                     p_in = p_in)
 
-        !$omp parallel do
-        do ii = 1, size(Z)
-            Z(ii) = X(ii, 1)
-        enddo
-        !$omp end parallel do
+        Z = X(:, 1)
 
         allocate(K(ub - lb + 1, m_star + 1))
 
@@ -708,27 +702,17 @@ module Expm
         do i = 1, j + 1
 
             if (i > j) then
-
                d_tilde = r
-
             endif
 
-            !$omp parallel do
-            do ii = 1, size(Z)
-                K(ii, 1) = Z(ii)
-                k(ii,2:m_star+1) = 0
-            enddo
-            !$omp end parallel do
+            K(:, 1) = Z
+            k(:,2:m_star+1) = 0
 
             m_hat = 0
 
             do kay = 1, d_tilde
 
-                !$omp parallel do
-                do ii = 1, size(Z)
-                    F(ii) = Z(ii)
-                enddo
-                !$omp end parallel do
+                F = Z
 
                 c_1 = Infinity_Norm(Z, MPI_communicator)
 
@@ -746,19 +730,11 @@ module Expm
                                             K(:, p + 1), &
                                             MPI_communicator)
 
-                        !$omp parallel do
-                        do ii = 1, size(Z)
-                            K(ii, p + 1) = h*K(ii,p+1)/real(p,dp)
-                        enddo
-                        !$omp end parallel do
+                        K(:, p + 1) = h*K(:, p+1)/real(p,dp)
 
                     endif
 
-                    !$omp parallel do
-                    do ii = 1, size(Z)
-                        F(ii) = F(ii) + (real(kay,dp)**real(p, dp))*K(ii,p+1)
-                    enddo
-                    !$omp end parallel do
+                    F = F + (real(kay,dp)**real(p, dp))*K(:,p+1)
 
                     c_2 = (real(kay,qp)**real(p, dp)) &
                             *Infinity_Norm(K(:,p + 1), MPI_communicator)
@@ -778,23 +754,12 @@ module Expm
 
                 m_hat = max(m_hat, indx)
 
-                !$omp parallel do
-                do ii = 1, size(Z)
-                    X(ii, kay + (i - 1)*d + 1) =  F(ii)
-                enddo
-                !$omp end parallel do
+                X(:, kay + (i - 1)*d + 1) =  F
 
             enddo
 
             if (i <= j) then
-
-
-                !$omp parallel do
-                do ii = 1, size(Z)
-                    Z(ii) = X(ii, i*d + 1)
-                enddo
-                !$omp end parallel do
-
+                Z = X(:, i*d + 1)
             endif
 
         enddo

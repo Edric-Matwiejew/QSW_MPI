@@ -1,3 +1,19 @@
+!   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+!   Copyright (C) 2019 Edric Matwiejew
+!
+!   This program is free software: you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation, either version 3 of the License, or
+!   (at your option) any later version.
+!
+!   This program is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 subroutine graph(   gamma, &
                     rows, &
                     nnz, &
@@ -27,8 +43,6 @@ subroutine graph(   gamma, &
 
     type(CSR) :: A, B
 
-    integer :: i
-
     allocate(A%row_starts(rows + 1))
     allocate(A%col_indexes(nnz))
     allocate(A%values(nnz))
@@ -36,45 +50,17 @@ subroutine graph(   gamma, &
     A%rows = rows
     A%columns = rows
 
-    !$omp parallel do
-    do i = 1, rows + 1
-        A%row_starts(i) = row_starts_in(i) + 1
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, nnz
-        A%col_indexes(i) = col_indexes_in(i) + 1
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, nnz
-        A%values(i) = values_in(i)
-    enddo
-    !$omp end parallel do
+    A%row_starts = row_starts_in + 1
+    A%col_indexes = col_indexes_in + 1
+    A%values = values_in
 
     call Generate_Graph_Hamiltonian(gamma, A, B)
 
     nnz_out = size(B%col_indexes)
 
-    !$omp parallel do
-    do i = 1, nnz_out
-        col_indexes_out(i) = B%col_indexes(i) - 1
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, nnz_out
-        values_out(i) = B%values(i)
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, rows + 1
-        row_starts_out = B%row_starts - 1
-    enddo
-    !$omp end parallel do
+    col_indexes_out = B%col_indexes - 1
+    values_out = B%values
+    row_starts_out = B%row_starts - 1
 
     deallocate(A%row_starts, A%col_indexes, A%values)
 
@@ -107,8 +93,6 @@ subroutine site_lindblads(  rows, &
 
     type(CSR) :: A, B
 
-    integer :: i
-
     allocate(A%row_starts(rows + 1))
     allocate(A%col_indexes(nnz))
     allocate(A%values(nnz))
@@ -116,45 +100,17 @@ subroutine site_lindblads(  rows, &
     A%rows = rows
     A%columns = rows
 
-    !$omp parallel do
-    do i = 1, rows + 1
-        A%row_starts(i) = row_starts_in(i) + 1
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, nnz
-        A%col_indexes(i) = col_indexes_in(i) + 1
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, nnz
-        A%values(i) = values_in(i)
-    enddo
-    !$omp end parallel do
+    A%row_starts = row_starts_in + 1
+    A%col_indexes = col_indexes_in + 1
+    A%values = values_in
 
     call Generate_Scattering_Lindblad_Operators(A, B)
 
     nnz_out = size(B%col_indexes)
 
-    !$omp parallel do
-    do i = 1, nnz_out
-        col_indexes_out(i) = B%col_indexes(i) - 1
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, nnz_out
-        values_out(i) = B%values(i)
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, rows + 1
-        row_starts_out = B%row_starts - 1
-    enddo
-    !$omp end parallel do
+    col_indexes_out(1:nnz_out) = B%col_indexes - 1
+    values_out(1:nnz_out) = B%values
+    row_starts_out = B%row_starts - 1
 
     deallocate(A%row_starts, A%col_indexes, A%values)
 
@@ -181,8 +137,6 @@ subroutine symmetrise(  rows, &
 
     type(CSR) :: A, B
 
-    integer :: i
-
     allocate(A%row_starts(rows + 1))
     allocate(A%col_indexes(nnz))
     allocate(A%values(nnz))
@@ -190,27 +144,13 @@ subroutine symmetrise(  rows, &
     A%rows = rows
     A%columns = rows
 
-    !$omp parallel do
-    do i = 1, rows + 1
-        A%row_starts(i) = row_starts(i) + 1
-    enddo
-    !$omp end parallel do
-
-    !$omp parallel do
-    do i = 1, nnz
-        A%col_indexes(i) = col_indexes(i) + 1
-    enddo
-    !$omp end parallel do
-
+    A%row_starts = row_starts + 1
+    A%col_indexes = col_indexes + 1
     A%values => values
 
     call Symmetrise_Graph_Weights(A, values_temp)
 
-    !$omp parallel do
-    do i = 1, nnz
-        values(i) = values_temp(i)
-    enddo
-    !$omp end parallel do
+    values = values_temp
 
     deallocate(A%row_starts, A%col_indexes)
 

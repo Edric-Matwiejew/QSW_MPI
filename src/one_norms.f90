@@ -1,4 +1,19 @@
+!   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+!   Copyright (C) 2019 Edric Matwiejew
 !
+!   This program is free software: you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation, either version 3 of the License, or
+!   (at your option) any later version.
+!
+!   This program is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 ! Module Linalg_One_Norm
 !> @brief MPI parallel CSR 1-norm estimation.
 !
@@ -26,8 +41,6 @@ module One_Norms
     end function Random_Choice
 
     subroutine  Seed_Random_Number(seed)
-
-        !! Purpose: Seeds the intrinsic fotran function 'random_number'.
 
         integer, intent(in) :: seed
 
@@ -112,7 +125,7 @@ module One_Norms
         integer :: k ! current algorithm iteration
 
         real(dp), dimension(t) :: Y_norms_local, Y_norms
-        real(dp), dimension(:), allocatable :: Z_norms_local, Z_norms
+        real(dp), dimension(:), allocatable :: Z_norms_local
 
         real(dp) :: est_old
 
@@ -136,8 +149,6 @@ module One_Norms
 
         integer :: i, j
 
-        !real(dp) :: start, finish, spmm_time
-
         !MPI environment
         integer :: flock
         integer :: rank
@@ -154,9 +165,8 @@ module One_Norms
         allocate(Y(lb:ub, t))
         allocate(S(lb:ub, t))
 
-        allocate(Z(A%columns, t))
-        allocate(Z_norms_local(A%columns))
-        allocate(Z_norms(A%columns))
+        allocate(Z(lb:ub, t))
+        allocate(Z_norms_local(lb:ub))
 
         allocate(h_inds_hist(0))
 
@@ -182,29 +192,18 @@ module One_Norms
 
         endif
 
-        !$omp parallel do
-        do i = lb, ub
-
-            X(i,1) = 1_dp/real(A%columns, dp)
-
-        enddo
-        !$omp end parallel do
+        X(:,1) = 1_dp/real(A%columns, dp)
 
         if (t > 1) then
 
             call system_clock(sys_clock)
             call Seed_Random_Number(sys_clock)
 
-            !$omp parallel do private(i) collapse(2)
             do j = 2, t
                 do i = lb, ub
-
                     X(i, j) = Random_Choice(plus_minus)/real(A%columns, dp)
-
                 enddo
             enddo
-            !$omp end parallel do
-
         endif
 
         complete = .false.
@@ -222,19 +221,13 @@ module One_Norms
                         Y, &
                         MPI_communicator)
 
-            !spmm_time = spmm_time + finish - start
-
             Y_norms_local = 0
 
-            !$omp parallel do private(i) collapse(2)
             do j = 1, t
                 do i = lb, ub
-
                     Y_norms_local(j) = Y_norms_local(j) + abs(Y(i, j))
-
                 enddo
             enddo
-            !$omp end parallel do
 
             call mpi_reduce(    Y_norms_local, &
                                 Y_norms, &
@@ -258,7 +251,6 @@ module One_Norms
 
             if (abs(est) < epsilon(est)) then
                 call mpi_barrier(mpi_communicator, ierr)
-                !write(*,*) "262"
                 exit
             endif
 
@@ -271,34 +263,25 @@ module One_Norms
             if ((k >= 2) .and. (est <= est_old)) then
                 est = est_old
                 call mpi_barrier(mpi_communicator, ierr)
-                !write(*,*) "275"
                 exit
             endif
 
             if (k > itmax) then
                 call mpi_barrier(mpi_communicator, ierr)
-                !write(*,*) "281"
                 exit
             endif
 
             est_old = est
 
-            !$omp parallel do private(i) collapse(2)
             do j = 1, t
                 do i = lb, ub
-
                     if (abs(Y(i, j)) < epsilon(est)) then
-
                         S(i, j) = 1
-
                     else
-
                        S(i,j) = Y(i, j)/abs(Y(i, j))
-
                     endif
                 enddo
             enddo
-            !$omp end parallel do
 
             call SpMM(  A_T, &
                         n, &
@@ -308,27 +291,13 @@ module One_Norms
                         Z, &
                         MPI_communicator)
 
-            !$omp parallel do
-            do i = 1, A%columns
-                Z_norms(i) = 0
-            enddo
-            !$omp end parallel do
+            Z_norms_local = 0
 
-            !$omp parallel do private(i) collapse(2)
             do j = 1, t
                 do i = lb, ub
                     Z_norms_local(i) = Z_norms_local(i) + abs(Z(i, j))
                 enddo
             enddo
-            !$omp end parallel do
-
-            call mpi_allreduce( Z_norms_local, &
-                                Z_norms, &
-                                A%columns, &
-                                mpi_double, &
-                                mpi_sum, &
-                                mpi_communicator, &
-                                ierr)
 
             h_maxes_local = 0
             h_inds_local = 0
@@ -336,8 +305,8 @@ module One_Norms
             do i = 1, t
                 do j = lb, ub
 
-                    if (Z_norms(j) > h_maxes_local(i)) then
-                        h_maxes_local(i) = Z_norms(j)
+                    if (Z_norms_local(j) > h_maxes_local(i)) then
+                        h_maxes_local(i) = Z_norms_local(j)
                         h_inds_local(i) = j
                     endif
 
@@ -345,7 +314,7 @@ module One_Norms
 
                 if (h_inds_local(i) == 0) exit
 
-                Z_norms(h_inds_local(i)) = 0
+                Z_norms_local(h_inds_local(i)) = 0
 
             enddo
 
@@ -393,7 +362,6 @@ module One_Norms
 
             if (complete) then
                 call mpi_barrier(mpi_communicator, ierr)
-                !write(*,*) "394"
                 exit
             endif
 
@@ -420,7 +388,6 @@ module One_Norms
 
             if (complete) then
                 call mpi_barrier(mpi_communicator, ierr)
-                !write(*,*) "421"
                 exit
             endif
 
@@ -465,13 +432,7 @@ module One_Norms
                             mpi_communicator, &
                             ierr)
 
-            !$omp parallel do private(i) collapse(2)
-            do j = 1, t
-                do i = lb, ub
-                    X(i,j) = 0
-                enddo
-            enddo
-            !$omp end parallel do
+            X = 0
 
             do i = 1, t
                 if ((lb <= e_i(i)) .and. (e_i(i) <= ub)) then
@@ -496,7 +457,6 @@ module One_Norms
         integer :: MPI_communicator
 
         real(dp), dimension(:), allocatable :: one_norms_local, one_norms
-        !real(dp) :: local_max
 
         integer :: lb_elements, ub_elements
         integer :: i, j
@@ -519,18 +479,12 @@ module One_Norms
             allocate(one_norms(0))
         endif
 
-        !$omp parallel do
-        do i = 1, A%columns
-            one_norms_local(i) = 0
-        enddo
-        !$omp end parallel do
+        one_norms_local = 0
 
-        !$omp parallel do
         do j = lb_elements, ub_elements
             one_norms_local(A%col_indexes(j)) = abs(A%values(j)) + &
                 one_norms_local(A%col_indexes(j))
         enddo
-        !$omp end parallel do
 
         call mpi_reduce(one_norms_local, &
                         one_norms, &
@@ -544,13 +498,11 @@ module One_Norms
         if (rank == 0) then
 
             norm = 0
-            !$omp parallel do reduction(max:norm)
             do i = 1, A%columns
                 if (one_norms(i) > norm) then
                     norm = one_norms(i)
                 endif
             enddo
-           !$omp end parallel do
 
         endif
 

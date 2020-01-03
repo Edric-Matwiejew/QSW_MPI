@@ -1,3 +1,19 @@
+!   QSW_MPI -  A package for parallel Quantum Stochastic Walk simulation.
+!   Copyright (C) 2019 Edric Matwiejew
+!
+!   This program is free software: you can redistribute it and/or modify
+!   it under the terms of the GNU General Public License as published by
+!   the Free Software Foundation, either version 3 of the License, or
+!   (at your option) any later version.
+!
+!   This program is distributed in the hope that it will be useful,
+!   but WITHOUT ANY WARRANTY; without even the implied warranty of
+!   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!   GNU General Public License for more details.
+!
+!   You should have received a copy of the GNU General Public License
+!   along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 !
 !   Module: Sparse_Operations
 !
@@ -692,29 +708,17 @@ module Sparse
 
                 mid = (start + finish) / 2
 
-                !$omp taskgroup
-
-                !$omp task shared(column_indexes, row_indexes, values) untied, & 
-                !$omp& if(finish - start >= 256)
                 call Merge_Sort_Dagger( column_indexes, &
                                         row_indexes, &
                                         values, &
                                         start, &
                                         mid)
-                !$omp end task
 
-                !$omp task shared(column_indexes, row_indexes, values) untied, & 
-                !$omp& if(finish - start >= 256)
                 call Merge_Sort_Dagger( column_indexes, &
                                         row_indexes, &
                                         values, &
                                         mid + 1, &
                                         finish)
-                !$omp end task
-
-                !$omp taskyield
-
-                !$omp end taskgroup
 
                 call Merge_Dagger(  column_indexes, &
                                     row_indexes, &
@@ -748,9 +752,6 @@ module Sparse
         integer, dimension(:), allocatable :: column_indexes_in
         complex(dp), dimension(:), allocatable :: values
 
-        !integer :: col_ind_temp, row_ind_temp
-        !complex(dp) :: val_temp
-
         integer, dimension(:), allocatable :: send_counts, rec_counts
         integer, dimension(:), allocatable :: send_disps, rec_disps
 
@@ -763,17 +764,11 @@ module Sparse
 
         integer, dimension(:), allocatable :: target_rank
 
-        integer :: i, j!, k
-        !integer :: indx
-
-        !integer, dimension(:), allocatable :: row_start
-
-        !real(dp) :: start, finish
+        integer :: i, j
 
         !MPI_Environment
         integer :: rank
         integer :: flock
-        !integer, dimension(MPI_status_size) :: status
         integer :: ierr
 
         call MPI_comm_size(MPI_communicator, flock, ierr)
@@ -791,25 +786,19 @@ module Sparse
         allocate(row_indexes(A%row_starts(lb):A%row_starts(ub + 1) - 1))
         allocate(values(A%row_starts(lb):A%row_starts(ub + 1) - 1))
 
-        !$omp parallel do private(j)
         do i = lb, ub
             do j = A%row_starts(i), A%row_starts(i + 1) - 1
                 row_indexes(j) = i
             enddo
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do
         do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
             column_indexes(i) = A%col_indexes(i)
         enddo
-        !$omp end parallel do
 
-        !$omp parallel do
         do i = A%row_starts(lb), A%row_starts(ub + 1) - 1
             values(i) = A%values(i)
         enddo
-        !$omp end parallel do
 
         allocate(send_counts(flock))
 
@@ -817,7 +806,6 @@ module Sparse
 
         allocate(target_rank(A%row_starts(lb):A%row_starts(ub + 1) - 1))
 
-        !$omp parallel do private(j) reduction(+:send_counts)
         do i = lbound(column_indexes, 1), ubound(column_indexes, 1)
 
             do j = flock, 1, -1
@@ -828,7 +816,6 @@ module Sparse
                 endif
             enddo
         enddo
-        !$omp end parallel do
 
         allocate(send_disps(flock))
 
@@ -944,15 +931,11 @@ module Sparse
                             MPI_communicator, &
                             ierr)
 
-        !$omp parallel 
-        !$omp single
         call Merge_Sort_Dagger( column_indexes_in, &
                                 A_T%col_indexes, &
                                 A_T%values, &
                                 1, &
                                 size(column_indexes_in))
-        !$omp end single
-        !$omp end parallel
 
         allocate(A_T%row_starts(lb:ub+1))
 
@@ -1170,8 +1153,6 @@ module Sparse
 
         integer :: i, j, k, l
 
-        !real(dp) :: start, finish, calc_time
-
         ! MPI environment
         integer :: ierr
 
@@ -1192,8 +1173,6 @@ module Sparse
 
         allocate(rec_values(num_rec))
         allocate(send_values(num_send))
-
-        !calc_time = 0
 
         do l = 1, n
 
@@ -1220,7 +1199,6 @@ module Sparse
 
             C_local = 0
 
-            !$omp parallel do private(j, k)
             do i = lb, ub
                 do j = A%row_starts(i), A%row_starts(i + 1) - 1
                     do k = 1, B_col
@@ -1229,9 +1207,6 @@ module Sparse
                     enddo
                 enddo
             enddo
-            !$omp end parallel do
-
-            !calc_time = calc_time + finish - start
 
             if (l < n) then
                 B_resize(lb:ub,:) = C_local
@@ -1348,7 +1323,6 @@ module Sparse
 
         v_local = 0
 
-        !$omp parallel do private(j)
         do i = lb, ub
             do j = A%row_starts(i), A%row_starts(i + 1) - 1
 
@@ -1357,7 +1331,6 @@ module Sparse
 
             enddo
         enddo
-        !$omp end parallel do
 
         calc = calc + finish - start
 
@@ -1379,15 +1352,9 @@ module Sparse
 
         integer :: lb, ub, lb_elements, ub_elements
 
-        !integer, intent(out) :: total_rec_inds
-        !integer, dimension(:), allocatable :: RHS_rec_inds
         integer :: node
 
-        !integer, dimension(:), allocatable :: mapping_offsets
-
         integer :: i, j
-
-        !real(dp) :: start, finish
 
         !MPI ENVIRONMENT
         integer :: rank
@@ -1407,12 +1374,7 @@ module Sparse
         ! Determine the number of unique RHS indexes to recieve from each node
         ! and their total.
 
-        !allocate(A%num_rec_inds(flock)) 
         A%num_rec_inds = 0
-
-        !allocate(RHS_rec_inds(0))
-
-        !total_rec_inds = 0
 
         do i = lb_elements, ub_elements
 
@@ -1428,14 +1390,11 @@ module Sparse
                     enddo
 
                     A%num_rec_inds(node) = A%num_rec_inds(node) + 1
-                    !total_rec_inds = total_rec_inds + 1
 
             endif
         enddo
 
         ! Calculate the offset of the external elements in the 1D receive buffer.
-
-        !allocate(A%rec_disps(flock))
 
         A%rec_disps = 0
         do i = 2, flock
@@ -1468,7 +1427,6 @@ module Sparse
 
         integer :: lb, ub, lb_elements, ub_elements
 
-        !integer :: total_rec_inds
         integer, dimension(:), allocatable :: RHS_rec_inds
         integer :: node
 
@@ -1476,9 +1434,6 @@ module Sparse
 
         integer :: i, j
 
-        !real(dp) :: start, finish
-
-        !MPI ENVIRONMENT
         integer :: rank
         integer :: flock
         integer :: ierr
@@ -1497,37 +1452,19 @@ module Sparse
         lb_elements = lbound(A%col_indexes, 1)
         ub_elements = ubound(A%col_indexes, 1)
 
-        !! Calculate the offset of the external elements in the 1D receive buffer.
-
-        !allocate(A%rec_disps(flock))
-
-        !A%rec_disps = 0
-        !do i = 2, flock
-        !    A%rec_disps(i) = A%rec_disps(i - 1) + A%num_rec_inds(i - 1)
-        !enddo
-
-        ! Create an ordered list of unique RHS receive indexes. Remap CSR column
-        ! indexes pointing to external RHS vector elements such that their
-        ! access occurs with the same efficiency as the local RHS elements.
-
-        !allocate(A%local_col_inds(lb_elements:ub_elements))
         do i = lb_elements, ub_elements
             A%local_col_inds(i) = A%col_indexes(i)
         enddo
 
-        !deallocate(RHS_rec_inds)
         allocate(RHS_rec_inds(sum(A%num_rec_inds)))
         RHS_rec_inds = 0
 
         allocate(mapping_offsets(flock))
         mapping_offsets = 1
 
-        !start = omp_get_wtime()
         do i = lb_elements, ub_elements
 
             if ((A%local_col_inds(i) < lb) .or. (A%local_col_inds(i) > ub)) then
-
-                !if (.not. any(A%local_col_inds(i) == RHS_rec_inds)) then
 
                     do j = flock, 1, -1
 
@@ -1670,27 +1607,15 @@ module Sparse
 
                 mid = (start + finish) / 2
 
-                !$omp taskgroup
-
-                !$omp task shared(column_indexes, values) untied, &
-                !$omp& if(finish - start >= 256)
                 call Merge_Sort_CSR( column_indexes, &
                                         values, &
                                         start, &
                                         mid)
-                !$omp end task
 
-                !$omp task shared(column_indexes, values) untied, &
-                !$omp& if(finish - start >= 256)
                 call Merge_Sort_CSR( column_indexes, &
                                         values, &
                                         mid + 1, &
                                         finish)
-                !$omp end task
-
-                !$omp taskyield
-
-                !$omp end taskgroup
 
                 call Merge_CSR(  column_indexes, &
                                     values, &
@@ -1713,14 +1638,12 @@ module Sparse
         integer :: i
 
         do i = lbound(A%row_starts,1), ubound(A%row_starts,1) - 1
-            !$omp parallel
-            !$omp single
+
             call Merge_Sort_CSR(A%col_indexes(A%row_starts(i):A%row_starts(i + 1) - 1), &
                                 A%values(A%row_starts(i):A%row_starts(i + 1) - 1), &
                                 1, &
                                 A%row_starts(i + 1) - A%row_starts(i))
-            !$omp end single
-            !$omp end parallel
+
         enddo
 
     end subroutine Sort_CSR

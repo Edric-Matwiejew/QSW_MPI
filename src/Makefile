@@ -1,7 +1,7 @@
 #Makefile
 
 # Shell command for the python interpreter.
-PYTHON_CALL ?= python
+PYTHON_CALL ?= python3
 # Set to TRUE to compile with debug flags.
 DEBUG ?= FALSE
 
@@ -20,11 +20,11 @@ else
 endif
 
 # Determine extension of generated f2py shared object libraries.
-ifeq ($(shell $(PYTHON_CALL) -V |& cut -d " "  -f 2 | head -c 1), 3)
-	EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
-else
-	EXT_SUFFIX := '.so'
-endif
+#ifeq ($(shell $(PYTHON_CALL) -V |& cut -d " "  -f 2 | head -c 1), 3)
+EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
+#else
+#	EXT_SUFFIX := '.so'
+#endif
 
 ####
 
@@ -56,5 +56,5 @@ $(OBJDIR)/iso_precisions.o: iso_precisions.f90
 ####
 
 clean:
-	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(OBJDIR)/*.so $(PYDIR)/*.so *.so *.o
+	rm $(OBJDIR)/*.o $(OBJDIR)/*.mod $(PYDIR)/*.so
 
