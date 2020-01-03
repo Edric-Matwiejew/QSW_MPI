@@ -1,7 +1,7 @@
 Installation
 ============
 
-Currently QSW_MPI is compiled to run on the following systems. Source code is avaliable `here <https://github.com/Edric-Matwiejew>`_.  
+Currently QSW_MPI is compiled to run on the following systems. Source code is avaliable `here <https://github.com/Edric-Matwiejew>`_.
 
 Linux
 *****
