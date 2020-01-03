@@ -11,9 +11,17 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+from unittest.mock import MagicMock
 import sys
 sys.path.insert(0, os.path.abspath("../.."))
 
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        return MagicMock()
+
+MOCK_MODULES = ['mpi4py', 'qsw_mpi.foperators', 'qsw_mpi.fMPI']
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # -- Project information -----------------------------------------------------
 
@@ -55,3 +63,4 @@ html_static_path = ['_static']
 autodoc_mock_imports = ["mpi4py"]
 
 master_doc = 'index'
+
