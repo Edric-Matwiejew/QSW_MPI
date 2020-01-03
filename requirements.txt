@@ -3,7 +3,7 @@ scipy
 mpi4py
 h5py
 networkx
-freeqsw
+qsw_mpi
 MPI
 operators
 io
