@@ -9,9 +9,6 @@ version: 1
 sphinx:
   configuration: docs/source/conf.py
 
-formats:
-    - html
-
 # Optionally set the version of Python and requirements required to build your docs
 python:
   version: 3.7
