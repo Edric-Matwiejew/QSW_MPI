@@ -17,8 +17,6 @@ __pycache__
 *.pyc
 *.npz
 *.mtx
-*.jpg
-*.jpeg
 junk
 build/*
 *egg-info
