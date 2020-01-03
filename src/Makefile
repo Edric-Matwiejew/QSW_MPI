@@ -19,17 +19,12 @@ else
 	FCFLAGS = -O3 -ffast-math -funroll-loops -mtune=native
 endif
 
-# Determine extension of generated f2py shared object libraries.
-#ifeq ($(shell $(PYTHON_CALL) -V |& cut -d " "  -f 2 | head -c 1), 3)
 EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
-#else
-#	EXT_SUFFIX := '.so'
-#endif
-
-####
 
 OBJDIR := obj
 PYDIR := ../qsw_mpi
+
+$(shell mkdir -p $(OBJDIR))
 
 $(OBJDIR)/%.o: %.f90
 	$(FC) $(FCFLAGS) -I$(OBJDIR) -J$(OBJDIR) -c $< -o $@ -fPIC
