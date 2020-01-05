@@ -3,13 +3,13 @@ QSW_MPI
 =======
 
 .. image:: https://readthedocs.org/projects/qsw-mpi/badge/?version=latest
-:target: https://qsw-mpi.readthedocs.io/en/latest/?badge=latest
-:alt: Documentation Status
+    :target: https://qsw-mpi.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
 Overview
 --------
 
-QSW_MPI provides an parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks please consult the `documentation <https://qsw-mpi.readthedocs.io/en/latest/>`.
+QSW_MPI provides an parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks please consult the `documentation <https://qsw-mpi.readthedocs.io/en/latest/>`_.
 
 Requirements
 ------------
@@ -17,7 +17,7 @@ Requirements
 * GNU Fortran 5 or higher
 * A functional MPI implementation
 * HDF5
-* Python 3.6.9 and python packages packages:
+* Python 3.6.9 or higher with python packages packages:
     * mpi4py
     * NumPy
     * SciPy
@@ -34,7 +34,7 @@ After cloning the repository enter 'QSW_MPI/src' and build the Fortran shared ob
 
     make
 
-After this the QSW_MPI package may be used by importing the 'QSW_MPI' folder to python's system path:
+After this the QSW_MPI package may be used by importing the 'QSW_MPI' folder to python's system path at runtime:
 
 .. code-block:: python
 
@@ -58,7 +58,7 @@ Usage
 -----
 A usage example is included in 'QSW_MPI/examples'. The is run by issuing the terminal command:
 
-.. code-bash:: bash
+.. code-block:: bash
 
     mpiexec -N 2 python3 example.py
 
