@@ -1,1 +1,1 @@
-include README.md LICENSE examples/*.py 
+include README.rst LICENSE examples/*.py 
