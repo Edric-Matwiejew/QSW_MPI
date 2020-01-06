@@ -113,7 +113,7 @@ Other Files
     * plot_results.py - Plots time as a function of MPI processes.
 
 * docs/
-  * Makefile - Documentaion make script for Unix-like systems.
-  * make.bat - Documenation build script for Windows systems.
-  * requirements.txt - Requirements to build documentation of Read the Docs.
-  * source/ - Documenation source files and images.
+    * Makefile - Documentaion make script for Unix-like systems.
+    * make.bat - Documenation build script for Windows systems.
+    * requirements.txt - Requirements to build documentation of Read the Docs.
+    * source/ - Documenation source files and images.
