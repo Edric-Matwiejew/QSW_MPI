@@ -23,14 +23,14 @@ Requirements
     * SciPy
     * H5py
     * Matplotlib
-    * Networkx (In order to run usage examples.)
+    * Networkx
 
 Installation
 ------------
 
 After cloning the repository enter 'QSW_MPI/src' and build the Fortran shared object libraries:
 
-.. code-block:: bash
+.. code-block::
 
     make
 
@@ -44,22 +44,93 @@ After this the QSW_MPI package may be used by importing the 'QSW_MPI' folder to 
 
 Or, to install 'QSW_MPI' as normal, in the 'QSW_MPI' folder generate a distribution archive:
 
-.. code-block:: python
+.. code-block::
 
     python3 setup.py sdist bdist_wheel
 
 Enter the newly created 'QSW_MPI/dist' folder which should contain the archive 'qsw_mpi-0.0.1.tar.gz'. For with the QSW_MPI can be installed using pip3:
 
-.. code-block:: bash
+.. code-block::
 
     pip3 install qsw_mpi-0.0.1.tar.gz
+
+Documention
+-----------
+
+To obtain a local copy of the documentaion, with python package `Sphinx <http://www.sphinx-doc.org/en/master/>`_ and the Read the Docs Sphinx `Theme <https://sphinx-rtd-theme.readthedocs.io/en/stable/>`_ installed, enter `QSW\_MPI/docs` and build the documentation:
+
+.. code-block::
+
+    make html
+
 
 Usage
 -----
 A usage example is included in 'QSW_MPI/examples'. The is run by issuing the terminal command:
 
-.. code-block:: bash
+.. code-block::
 
     mpiexec -N 2 python3 example.py
 
+QSW_MPI Package Contents Overview
+---------------------------------
 
+Program Files
+^^^^^^^^^^^^^
+
+* src/ - Source code for fortran subroutines, interfaces and fortran subroutine makefile.
+    * Makefile - Makefile to produce foperators and fMPI shared object libraries.
+    * foperators.f90 - Source code for foperators shared object library.
+    * fMPI.f90 - Source code for fMPI shared object library.
+    * iso_precisions.f90 - Defines fortran precision types.
+    * sparse.f90 - Sparse data representation and parallel BLAS operations.
+    * one_norms.f90 - Parallel 1-norm estimation.
+    * expm.f90 - Parallel calculation of the action of the matrix exponentional on a complex vector.
+    * operatots.f90 - Creation of local and distributed quantum stochastic walk operators.
+
+* qsw_mpi/ - QSW_MPI python module, provides an interface to the fortran subroutines and additional functionality.
+    * MPI.py - Parallel operations, quantum stochastic walk system creation and propagation.
+    * operators.py - Creation of local quantum stochastic walk operators.
+    * measure.py - Extract results from propagated walks.
+    * io.py - Input and output of results.
+    * plot.py - Basic visualization of results.
+    * __init__.py - Package initialization.
+
+Other
+^^^^^
+
+* README.rst - QSW_MPI basic information.
+* LICENSE - QSW_MPI license.
+* setup.py - Configuration file used to generate a distribution archieve.
+* MANIFEST.in - Additional files to include in the distribution archive.
+
+* examples/
+    * example.py - Usage example detailed in "QSW_MPI: A framework for parallel simulation of quantum stochastic walks".
+
+* benchmark/ - Simple benchmark of parallel performance.
+    * RUN_ME.sh - Benchmark automation bash script.
+    * graphgen.py - Creation of test graph sets.
+    * steps.py - Performs a quantum stochastic walks on the generated graphs.
+    * plot_results.py - Plots time as a function of MPI processes.
+
+* docs/ - Source code to generated QSW_MPI documentation using Sphinix.
+  * Makefile - Make script for Unix-like systems.
+  * make.bat - Make script for Windows systems.
+  * requirements.txt - Requirements to build documentation of Read the Docs.
+  * source/
+    * conf.py - Sphinx configuration file.
+    * index.rst
+    * installtaion.rst
+    * intro.rst
+    * qsw_mpi.rst
+    * theory.rst
+    * usage_example.rst
+    * images/ - Documenation figures.
+        * animation.gif
+        * augmented_wheel_graph.jpeg
+        * coherence_bars.jpeg
+        * coherence_lines.jpeg
+        * dimer_aug.jpeg
+        * population_bars.jpeg
+        * population_lines.jpeg
+        * wheel_graph.jpeg
