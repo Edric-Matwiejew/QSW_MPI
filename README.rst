@@ -77,8 +77,15 @@ QSW_MPI Package Contents Overview
 
 Program Files
 ^^^^^^^^^^^^^
+* qsw_mpi/
+    * __init__.py - Python package initialization.
+    * MPI.py - Parallel operations, quantum stochastic walk system creation and propagation.
+    * operators.py - Creation of local quantum stochastic walk operators.
+    * measure.py - Extract results from propagated walks.
+    * io.py - Input and output of results.
+    * plot.py - Basic visualization of results.
 
-* src/ - Source code for fortran subroutines, interfaces and fortran subroutine makefile.
+* src/
     * Makefile - Makefile to produce foperators and fMPI shared object libraries.
     * foperators.f90 - Source code for foperators shared object library.
     * fMPI.f90 - Source code for fMPI shared object library.
@@ -88,16 +95,8 @@ Program Files
     * expm.f90 - Parallel calculation of the action of the matrix exponentional on a complex vector.
     * operatots.f90 - Creation of local and distributed quantum stochastic walk operators.
 
-* qsw_mpi/ - QSW_MPI python module, provides an interface to the fortran subroutines and additional functionality.
-    * MPI.py - Parallel operations, quantum stochastic walk system creation and propagation.
-    * operators.py - Creation of local quantum stochastic walk operators.
-    * measure.py - Extract results from propagated walks.
-    * io.py - Input and output of results.
-    * plot.py - Basic visualization of results.
-    * __init__.py - Package initialization.
-
-Other
-^^^^^
+Other Files
+^^^^^^^^^^^
 
 * README.rst - QSW_MPI basic information.
 * LICENSE - QSW_MPI license.
@@ -107,30 +106,14 @@ Other
 * examples/
     * example.py - Usage example detailed in "QSW_MPI: A framework for parallel simulation of quantum stochastic walks".
 
-* benchmark/ - Simple benchmark of parallel performance.
+* benchmark/
     * RUN_ME.sh - Benchmark automation bash script.
     * graphgen.py - Creation of test graph sets.
     * steps.py - Performs a quantum stochastic walks on the generated graphs.
     * plot_results.py - Plots time as a function of MPI processes.
 
-* docs/ - Source code to generated QSW_MPI documentation using Sphinix.
-  * Makefile - Make script for Unix-like systems.
-  * make.bat - Make script for Windows systems.
+* docs/
+  * Makefile - Documentaion make script for Unix-like systems.
+  * make.bat - Documenation build script for Windows systems.
   * requirements.txt - Requirements to build documentation of Read the Docs.
-  * source/
-    * conf.py - Sphinx configuration file.
-    * index.rst
-    * installtaion.rst
-    * intro.rst
-    * qsw_mpi.rst
-    * theory.rst
-    * usage_example.rst
-    * images/ - Documenation figures.
-        * animation.gif
-        * augmented_wheel_graph.jpeg
-        * coherence_bars.jpeg
-        * coherence_lines.jpeg
-        * dimer_aug.jpeg
-        * population_bars.jpeg
-        * population_lines.jpeg
-        * wheel_graph.jpeg
+  * source/ - Documenation source files and images.
