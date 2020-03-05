@@ -2,9 +2,13 @@
 QSW_MPI
 =======
 
-.. image:: https://readthedocs.org/projects/qsw-mpi/badge/?version=latest
+|docs| |doi|
+
+.. |docs| image:: https://readthedocs.org/projects/qsw-mpi/badge/?version=latest
     :target: https://qsw-mpi.readthedocs.io/en/latest/?badge=latest
-    :alt: Documentation Status
+
+.. |doi| image:: https://zenodo.org/badge/205545419.svg
+   :target: https://zenodo.org/badge/latestdoi/205545419
 
 Overview
 --------
