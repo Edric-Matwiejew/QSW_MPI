@@ -13,7 +13,7 @@ QSW_MPI
 Overview
 --------
 
-QSW_MPI provides an parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks please consult the `documentation <https://qsw-mpi.readthedocs.io/en/latest/>`_, or preprint `_article <https://arxiv.org/pdf/2003.02450.pdf>`__.
+QSW_MPI provides an parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks please consult the `documentation <https://qsw-mpi.readthedocs.io/en/latest/>`_, or preprint `article <https://arxiv.org/pdf/2003.02450.pdf>`_.
 
 Requirements
 ------------
