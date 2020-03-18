@@ -557,8 +557,6 @@ module Expm
         enddo
         finish = MPI_wtime()
 
-        !write(*,*) "LOOP", finish - start, "norm", norm
-
         ! Final call to deallocate saved arrays.
         call SpMV_Series(   A_temp, &
                             B_temp_1, &

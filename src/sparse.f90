@@ -1302,7 +1302,6 @@ module Sparse
                 deallocate(rec_values)
                 deallocate(send_values)
             endif
-            !write(*,*) "calc", calc, "comm", comm, "sum", calc + comm, "guff", guff, "Allreduce + calc", send + calc, "ALL", send
             return
         endif
 
@@ -1361,8 +1360,6 @@ module Sparse
             deallocate(u_resize)
             deallocate(rec_values)
             deallocate(send_values)
-            !write(*,*) "calc", calc, "comm", comm, "sum", calc + comm, "guff", guff
-            !write(*,*) "AllReduce", send
         endif
 
     end subroutine SpMV_Series

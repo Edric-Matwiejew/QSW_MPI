@@ -668,8 +668,6 @@ subroutine step(M_rows, &
                             target_precision = target_precision)
         finish = MPI_wtime()
 
-        write(*,*) finish - start
-
 end subroutine step
 
 subroutine gather_step( M_local_rows, &
