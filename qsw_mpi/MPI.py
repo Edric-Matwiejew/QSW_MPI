@@ -305,8 +305,6 @@ class walk(object):
                 self.rho = np.diag(np.concatenate((state, np.zeros((self.pad,))), axis = 0))
                 self.initial_state_gen = 'User'
 
-        print(self.rho.shape)
-
         self.rho_v = fMPI.initial_state(
                 self.M_local_rows,
                 self.rho,
