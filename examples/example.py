@@ -8,8 +8,6 @@ import networkx as nx
 import matplotlib
 import matplotlib.pyplot as plt
 
-matplot
-
 mpi_comm = MPI.COMM_WORLD
 rank = mpi_comm.Get_rank()
 
