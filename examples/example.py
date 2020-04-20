@@ -5,7 +5,10 @@ from mpi4py import MPI
 import qsw_mpi as qsw
 import numpy as np
 import networkx as nx
+import matplotlib
 import matplotlib.pyplot as plt
+
+matplot
 
 mpi_comm = MPI.COMM_WORLD
 rank = mpi_comm.Get_rank()
@@ -15,7 +18,7 @@ Graph = nx.wheel_graph(vertices)
 G = nx.to_scipy_sparse_matrix(Graph, dtype = np.complex128)
 
 if rank == 0:
-
+    matplotlib.use("Agg")
     ax = plt.subplot(label = 'graph')
     ax.axis('off')
     nx.draw_networkx(Graph, with_labels = True, node_color='orange')
