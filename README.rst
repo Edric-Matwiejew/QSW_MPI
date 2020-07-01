@@ -7,8 +7,8 @@ QSW_MPI
 .. |docs| image:: https://readthedocs.org/projects/qsw-mpi/badge/?version=latest
     :target: https://qsw-mpi.readthedocs.io/en/latest/?badge=latest
 
-.. |doi| image:: https://zenodo.org/badge/205545419.svg
-   :target: https://zenodo.org/badge/latestdoi/205545419
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3924889.svg
+   :target: https://doi.org/10.5281/zenodo.3924889
 
 Overview
 --------
