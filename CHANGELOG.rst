@@ -3,7 +3,7 @@ Changelog
 =========
 
 **********************************
-1.0.0 - 2020-06-26 Feature Release
+1.0.0 - 2020-07-01 Feature Release
 **********************************
 
 This is a major revision of QSW_MPI. The focus of this realse is the expansion of the simulation capabilities of QSW_MPI while focussing the scope of the package through removal of features which are better supported through pre-exisiting alernatives (specifically file I/O and visualisation).
