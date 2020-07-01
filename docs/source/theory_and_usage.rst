@@ -5,10 +5,10 @@ Theory
 
 This section provides an overview of the mathematical formalism
 underpinning QSWs. The starting point is a discussion of graph theory
-terminology, which draws pimarily from Refs.\ :sup:`1` and\ :sup:`2`,
+terminology, which draws primarily from Refs.\ :sup:`1` and\ :sup:`2`,
 followed definition of CTRWs and CTQWs on graphs. An overview of the
 master equation approach to the description of Markovian open systems is
-then provided. From this the L-QSW master equation is then introduced,
+then provided. From this, the L-QSW master equation is then introduced,
 which unifies the CTRW and CTQW models under a density theoretic
 framework. The practical extension of this equation to the inclusion of
 non-Hermitian absorption and emission process is then discussed. Next,
@@ -108,7 +108,7 @@ where the off-diagonal elements :math:`M_{ij}` represent the probability
 flow along an edge from vertex :math:`j` to vertex :math:`i`, while the
 diagonal elements :math:`M_{jj}` account for the total outflow from
 vertex :math:`j` per unit time. Scalar :math:`\gamma \in \mathbb{R}` is
-the system wide transition rate\ :sup:`2`.
+the system-wide transition rate\ :sup:`2`.
 
 Continuous-Time Quantum Walks
 -----------------------------
@@ -138,7 +138,7 @@ vertex :math:`v_i` at time :math:`t` is
 :math:`|\langle v_i \vert \Psi(t) \rangle|^2`.
 
 While Equations :eq:`eq:CTRW` and :eq:`eq:CTQW`
-appear superficially similar, there are several fundamental differences
+appear superficially similar; there are several fundamental differences
 between the two processes. Firstly, :math:`\lvert \Psi(t) \rangle`
 describes a complex probability amplitude, meaning that its possible
 paths may interfere. Secondly, the Hermiticity requirement on :math:`H`
@@ -203,7 +203,7 @@ system, while :math:`S + B` is closed in the sense that its dynamics can
 be described unitarily. Under the conditions that the evolution of S is
 Markovian with no correlation between S and B at t = 0, and given
 :math:`\mathcal{H}_S` of finite dimensions :math:`N`. The dynamics of S
-are described by a generalization of Equation
+are described by a generalisation of Equation
 :eq:`eq:liouville-von-neumann`: the GKSL
 quantum master equation\ :sup:`5`,
 
@@ -354,7 +354,7 @@ Global Environment Interaction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A global-interaction quantum stochastic walk (G-QSW) differs from a
-L-QSW in that it utilizes a single Lindblad operator derived from the
+L-QSW in that it utilises a single Lindblad operator derived from the
 digraph adjacency matrix,
 
 .. math::
@@ -364,7 +364,7 @@ digraph adjacency matrix,
 
 However, a Lindblad operator of this form has the potentially
 undesirable effect of inducing transitions between vertices whose arcs
-connect to a common outgoing vertex, a phenomena termed spontaneous
+connect to a common outgoing vertex; a phenomenon termed spontaneous
 moralisation. A demoralisation correction scheme can be applied to
 arrive at a non-moralising G-QSW (NM-G-QSW), which respects the
 connectivity of the originating digraph. This proceeds by a homomorphic
@@ -427,7 +427,7 @@ Graph Demoralisation
           \end{cases}
 
    which changes the state within subspaces of V in order to prevent
-   occurrence of stationary states dependant only on the expanded vertex
+   the occurrence of stationary states dependant only on the expanded vertex
    set of :math:`\mathcal{G}^D`.
 
 Through formation of :math:`L^D`, the spontaneous moralisation is
@@ -455,7 +455,7 @@ are related to the probability of measuring the state in vertex
 
      p(v_i, t) = \sum_{v^k_i \in V_i^D}\langle v^k_i \rvert\rho^{D}(t)\lvert v^k_i \rangle.
 
-Vectorization of the Master Equation
+Vectorisation of the Master Equation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Equations :eq:`eq:qsw`, :eq:`eq:qsw_ss` and
@@ -493,7 +493,7 @@ Package Overview
 ================
 
 QSW simulation occurs through use of the :mod:`qsw_mpi.MPI` submodule which provides for the creation of distributed
-:math:`\tilde{\mathcal{L}}`, vectorization of :math:`\rho(0)`, and
+:math:`\tilde{\mathcal{L}}`, vectorisation of :math:`\rho(0)`, and
 evolution of the system dynamics. In particular, the user creates and
 calls methods from one of the following :class:`~qsw_mpi.MPI.walk` classes:
 
@@ -883,7 +883,7 @@ formulated as an optimisation task with the objective function being
 minimisation of the vector :math:`\Delta \vec{\eta}(\omega)`, the
 difference in EST between the disordered network and dimer at
 corresponding :math:`\omega` values. For this, the SciPy
-``least_squares`` optimisation algorithm was used. The result of the
+``least_squares``optimisation algorithm was used. The result of the
 fitting process is shown in :numref:`dimer-fit` for a network with N = 7.
 Despite being a much simpler system, the dimer closely approximates
 :math:`\eta(\omega)` of the disordered network.
