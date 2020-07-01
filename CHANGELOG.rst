@@ -6,16 +6,16 @@ Changelog
 1.0.0 - 2020-07-01 Feature Release
 **********************************
 
-This is a major revision of QSW_MPI. The focus of this realse is the expansion of the simulation capabilities of QSW_MPI while focussing the scope of the package through removal of features which are better supported through pre-exisiting alernatives (specifically file I/O and visualisation).
+This is a major revision of QSW_MPI. The focus of this release is the expansion of the simulation capabilities of QSW_MPI while focussing the scope of the package through the removal of features which are better supported through pre-existing alternatives (specifically file I/O and visualisation).
 
 Added
 -----
 
-* Generalised support for quantum stochsatic walks, including the non-moralising quantum stochastic walk through the :class:`~qsw_mpi.MPI.LQSW` and :class:`~qsw_mpi.MPI.GQSW` classes.
-* Experimental support for sparse systems following the Gorini–Kossakowski–Sudarshan–Lindblad equation in its diagonalised form thorugh the :class:`~qsw_mpi.MPI.GKSL` class.
+* Generalised support for quantum stochastic walks, including the non-moralising quantum stochastic walk through the :class:`~qsw_mpi.MPI.LQSW` and :class:`~qsw_mpi.MPI.GQSW` classes.
+* Experimental support for sparse systems following the Gorini–Kossakowski–Sudarshan–Lindblad equation in its diagonalised form through the :class:`~qsw_mpi.MPI.GKSL` class.
 * Support for MPI-enabled parallel output to HDF5 using H5Py via the non-user accessible module :mod:`~qsw_mpi.parallel_io`.
 
-* Addtional operator types including the cannonical Markov chain transition matrix, and those required for the demoralisation correction scheme.
+* Additional operator types including the canonical Markov chain transition matrix, and those required for the demoralisation correction scheme.
 
 Changed
 -------
@@ -26,7 +26,7 @@ Changed
 Removed
 -------
 
-* Removed visualisation module :mod:`~qsw_mpi.plot`. For basic visualisation direct use of Matplotlib and Networkx is recommended.
+* Removed visualisation module :mod:`~qsw_mpi.plot`. For basic visualisation, direct use of Matplotlib and Networkx is recommended.
 * Removed dedicated I/O module :mod:`~qsw_mpi.io`. For HDF5 file operations, direct use of H5Py is recommended.
 
 **********************************
