@@ -325,24 +325,23 @@ The local interaction QSW model naturally facilitates the modelling of non-Hermi
 .. math::
    :label: eq:dimer_aug
    
-   \begin{aligned}
    G^u = \begin{bmatrix}
    0 & 1 & 0 &0 \\ 
    1 & 0 & 0 & 0\\ 
    0 & 0 & 0 & 0\\ 
    0 & 0 & 0 & 0
-   \end{bmatrix}, &&
+   \end{bmatrix},
    G_{\text{aug}}=\begin{bmatrix}
    0 & 1 & 2 &0 \\ 
    1 & 0 & 0 & 0\\ 
    0 & 0 & 0 & 0\\ 
    0 & 3 & 0 & 0
-   \end{bmatrix}.\end{aligned}
+   \end{bmatrix}.
 
-The walk Hamiltonian is then derived from :math:`G^u` and the :math:`L_k` corresponding to scattering and dephasing on :math:`\mathcal{G}` from :math:`G`. Finally, :math:`L_k` originating from :math:`\mathcal{G}^\Gamma` and :math:`\mathcal{G}^\Theta` are formed as :math:`\bra{v_j}L_k\ket{v_i} = G^{\Gamma}_{ij}` and :math:`\bra{v_j}L_k\ket{v_i} = G^{\Theta}_{ij}` respectively, appearing in additional terms appended to Equation (\ref{eq:qsw}) outside the scope of :math:`\omega`. An L-QSW incorporating both absorptive and emissive processes is then succinctly expressed as,
+The walk Hamiltonian is then derived from :math:`G^u` and the :math:`L_k` corresponding to scattering and dephasing on :math:`\mathcal{G}` from :math:`G`. Finally, :math:`L_k` originating from :math:`\mathcal{G}^\Gamma` and :math:`\mathcal{G}^\Theta` are formed as :math:`\langle v_j | L_k | v_i \rangle = G^{\Gamma}_{ij}` and :math:`\langle v_j | L_k | v_i \rangle = G^{\Theta}_{ij}` respectively, appearing in additional terms appended to Equation :eq:`eq:qsw` outside the scope of :math:`\omega`. An L-QSW incorporating both absorptive and emissive processes is then succinctly expressed as,
 
 .. math::
-       :label: eq:qsw_ss
+   :label: eq:qsw_ss
        
      \frac{d\rho(t)}{dt} = -\text{i}(1-\omega)[H, \rho(t)] + \omega \sum_{k = 1}^{\tilde{N}^2} \mathcal{D}_k[\rho(t)] \\ 
      + \sum_{k = 1}^{\tilde{N}^2}\mathcal{D}^{\Gamma}_k[\rho(t)] + \sum_{k = 1} ^{\tilde{N}^2}\mathcal{D}^{\Theta}_k[\rho(t)]
