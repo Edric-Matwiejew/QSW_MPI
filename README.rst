@@ -13,7 +13,7 @@ QSW_MPI
 Overview
 --------
 
-QSW_MPI provides an parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks please consult the `documentation <https://qsw-mpi.readthedocs.io/en/latest/>`_, or preprint `article <https://arxiv.org/pdf/2003.02450.pdf>`_.
+QSW_MPI provides a parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks, please consult the `documentation <https://qsw-mpi.readthedocs.io/en/latest/>`_, or preprint `article <https://arxiv.org/pdf/2003.02450.pdf>`_.
 
 Requirements
 ------------
@@ -25,13 +25,13 @@ Requirements
 
 Python packages:
 
-* pip for python3 (recommended to match installation intructions given in this document)
+* pip for python3 (recommended to match installation instructions given in this document)
 * mpi4py
 * NumPy
 * SciPy
 * H5py
 
-Addtional python packages required to run the usage examples:
+Additional python packages required to run the usage examples:
 
 * Networkx
 
@@ -70,7 +70,7 @@ Or, to install 'QSW_MPI' as normal, in the 'QSW_MPI' folder generate a distribut
 
     python3 setup.py sdist bdist_wheel
 
-Enter the newly created 'QSW_MPI/dist' folder which should contain the archive 'qsw_mpi-0.0.1.tar.gz'. For with the QSW_MPI can be installed using pip3:
+Enter the newly created 'QSW_MPI/dist' folder, which should contain the archive 'qsw_mpi-0.0.1.tar.gz'. For with the QSW_MPI can be installed using pip3:
 
 .. code-block::
 
@@ -104,7 +104,7 @@ Program Files
 
 * README.rst - QSW_MPI basic information.
 * LICENSE - QSW_MPI license.
-* setup.py - Configuration file used to generate a distribution archieve.
+* setup.py - Configuration file used to generate a distribution archive.
 * MANIFEST.in - Additional files to include in the distribution archive.
 
 * qsw_mpi/
@@ -122,7 +122,7 @@ Program Files
     * iso_precisions.f90 - Defines fortran precision types.
     * sparse.f90 - Sparse data representation and parallel BLAS operations.
     * one_norms.f90 - Parallel 1-norm estimation.
-    * expm.f90 - Parallel calculation of the action of the matrix exponentional on a complex vector.
+    * expm.f90 - Parallel calculation of the action of the matrix exponential on a complex vector.
     * operators.f90 - Creation of local and distributed quantum stochastic walk operators.
 
 Other Files
@@ -131,11 +131,11 @@ Other Files
     * example.py - Usage example detailed in "QSW_MPI: A framework for parallel simulation of quantum stochastic walks and the QSW_MPI documentation".
 
 * benchmarks/
-  * cray_benchmark: Scripts and program files used to test the scalability of QSW_MPI on distributed system as discussed in "QSW_MPI: A framework for parallel simulation of quantum stochastic walks and the QSW_MPI documentation".
-  * desktop_benchmark: Scripts and program file used to test the performance and accuracy of QSW_MPI in a workstation-like enviroment as compared to pre-exisiting packages, as discussed in "QSW_MPI: A framework for parallel simulation of quantum stochastic walks and the QSW_MPI documentation".
+  * cray_benchmark: Scripts and program files used to test the scalability of QSW_MPI on a distributed system as discussed in "QSW_MPI: A framework for parallel simulation of quantum stochastic walks and the QSW_MPI documentation".
+  * desktop_benchmark: Scripts and program file used to test the performance and accuracy of QSW_MPI in a workstation-like environment as compared to pre-existing packages, as discussed in "QSW_MPI: A framework for parallel simulation of quantum stochastic walks and the QSW_MPI documentation".
 
 * docs/
-    * Makefile - Documentaion make script for Unix-like systems.
-    * make.bat - Documenation build script for Windows systems.
+    * Makefile - Documentation make script for Unix-like systems.
+    * make.bat - Documentation build script for Windows systems.
     * requirements.txt - Requirements to build documentation of Read the Docs.
-    * source/ - Documenation source files and images.
+    * source/ - Documentation source files and images.
