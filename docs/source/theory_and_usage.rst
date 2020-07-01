@@ -44,17 +44,10 @@ graph containing no self-loops being referred to as a simple graph.
 QSW_MPI considers only the case of simple graphs where
 :math:`\text{Tr}(G) = 0`.
 
-Associated with :math:`\mathcal{G}` is the weighted graph
-:math:`\mathcal{G}^u = (V,E^u)` for which :math:`E` is replaced by the
-set of edges :math:`E^u = \{(v_i, v_j),(v_k, v_l) ...\}` with weights
-:math:`\text{w}(v_i,v_j) = \text{max}(\text{w}(v_i,v_j),\text{w}(v_j,v_i))`.
-The adjacency matrix of :math:`\mathcal{G}^u`, :math:`G^u`, is defined
-by Equation :eq:`eq:adjacency_graph`. A digraph is
-weakly connected if there exists a path between all
+Associated with :math:`\mathcal{G}` is the weighted but undirected graph :math:`\mathcal{G}^u = (V,E^u)`, where :math:`E^u` is a set of edges. This is represented by a symmetric adjacency matrix, :math:`G^u`, with weightings :math:`\text{w}^u(v_i,v_j)= \text{max}(\text{w}(v_j,v_i),\text{w}(v_i,v_j))` in Equation :eq:`eq:adjacency_graph`.  A digraph is weakly connected if there exists a path between all
 :math:`V \in \mathcal{G}^u`. Additionally, a digraph which satisfies the
 further condition of having a path between all :math:`V \in \mathcal{G}`
-is strongly connected. The strongly connected component of
-:math:`\mathcal{G}` is its maximally connected subgraph.
+is strongly connected. 
 
 The sum total of the outgoing edge weights from vertex :math:`v_j`,
 
@@ -319,65 +312,19 @@ representation of the local-interaction Lindblad operators,
 thus avoiding the need to form intermediate Kronecker products or store
 each Lindblad operator separately.
 
-The local interaction QSW model naturally facilitates the modelling of
-non-Hermitian transport through connected :math:`\mathcal{G}`. This is
-achieved by introducing a source vertex set, :math:`V_\Gamma`, and a
-sink vertex set, :math:`V_\Theta`, which are connected unidirectionaly
-to :math:`\mathcal{G}` by arc sets :math:`E_\Gamma` and
-:math:`E_\Theta`. Together with :math:`\mathcal{G}`, these form the
-augmented digraph, :math:`\mathcal{G}_{\text{aug}}`. The Hamiltonian is
-then derived from :math:`\mathcal{G}` (with :math:`G^u` padded to
-maintain dimensional consistency), and the :math:`L_k` from
-:math:`\mathcal{G}_{\text{aug}}`. Finally, the Lindblad operators
-originating from :math:`\mathcal{G}_\Gamma` and
-:math:`\mathcal{G}_\Theta` are appended to Equation
-:eq:`eq:qsw` as additional :math:`\mathcal{D}_k` terms outside
-the scope of :math:`\omega`. An L-QSW incorporating both absorptive and
-emissive processes is then succinctly expressed as,
-
-.. math::
-       :label: eq:qsw_ss
-
-       \frac{d\rho(t)}{dt} = -\text{i}(1-\omega)[H, \rho(t)] + \omega \sum_{k \in G}^{N^2} \mathcal{D}_k[\rho(t)] \\
-       + \sum_{k \in G_\Gamma} \Gamma_k \mathcal{D}_k[\rho(t)] + \sum_{k \in G_\Theta} \Theta_k \mathcal{D}_k[\rho(t)]
-
-where :math:`k = \tilde{N}(j-1) + i` with :math:`\tilde{N}` equal to
-:math:`N` plus the total vertices in :math:`E_\Gamma` and
-:math:`E_\Theta`, :math:`\Gamma_k > 0` is the absorption rate at
-:math:`v_k`, :math:`\Theta > 0` is the emission rate :math:`v_k`, and
-:math:`\rho(t)` is of dimensions :math:`\tilde{N} \times \tilde{N}`.
-QSW_MPI adopts an indexing scheme for the adjacency matrix of
-:math:`\mathcal{G}_{\text{aug}}` where the absorption channels (sources)
-are,
-
-.. math::
-   :label: eq:source
-
-       G_\Gamma = \{A_{ij} \subset G_\text{aug} : i > N, j \leq N\}
-
-and emission channels (sinks),
-
-.. math::
-   :label: eq:sinkl
-
-       G_\Theta = \{A_{ij} \subset G_\text{aug} : i \leq N, j > N\},
-
-For example, consider a dimer graph shown in :numref:`fig-dimer` on which absorption is modeled at
-:math:`v_1` (:math:`\Gamma_9 = 2`) and emission at :math:`v_2`
-(:math:`\Theta_8 = 3`). The corresponding :math:`G^u` and
-:math:`G_{\text{aug}}` are,
-
 .. figure:: graphics/dimer_aug.jpeg
    :width: 60%
    :align: center
    :name: fig-dimer
 
-   A dimer graph with a source (:math:`\Gamma`) attached to :math:`v_1`
-   and a sink (:math:`\Theta`) attached to :math:`v_2`. Note that the
-   absorption and emission channels are unidirectional.
+   A dimer graph with a source, :math:`\Gamma_3 = 2` attached to :math:`v_1` and a sink, :math:`\Theta_{14} = 3`, attached to :math:`v_2` (see Equations :eq:`eq:dimer_aug`) and (:eq:`eq:qsw_ss`). Note that the absorption and emission channels are unidirectional.
+
+
+The local interaction QSW model naturally facilitates the modelling of non-Hermitian transport through connected :math:`\mathcal{G}`. This is achieved by introducing a source vertex set, :math:`V^\Gamma`, and a sink vertex set, :math:`V^\Theta`, which are connected unidirectionaly to :math:`\mathcal{G}` by arc sets :math:`E^\Gamma` and :math:`E^\Theta`. Together with :math:`\mathcal{G}`, these form the augmented digraph, :math:`\mathcal{G}^{\text{aug}}`. For example, consider the dimer graph shown in Figure :numref:`fig-dimer` on which absorption is modeled at :math:`v_1` and emission at :math:`v_2`. In QSW_MPI, :math:`G^u` and :math:`G^{\text{aug}} = G + G^\Gamma + G^\Theta` are represented as,
 
 .. math::
-
+   :label: eq:dimer_aug
+   
    \begin{aligned}
    G^u = \begin{bmatrix}
    0 & 1 & 0 &0 \\ 
@@ -391,6 +338,16 @@ For example, consider a dimer graph shown in :numref:`fig-dimer` on which absorp
    0 & 0 & 0 & 0\\ 
    0 & 3 & 0 & 0
    \end{bmatrix}.\end{aligned}
+
+The walk Hamiltonian is then derived from :math:`G^u` and the :math:`L_k` corresponding to scattering and dephasing on :math:`\mathcal{G}` from :math:`G`. Finally, :math:`L_k` originating from :math:`\mathcal{G}^\Gamma` and :math:`\mathcal{G}^\Theta` are formed as :math:`\bra{v_j}L_k\ket{v_i} = G^{\Gamma}_{ij}` and :math:`\bra{v_j}L_k\ket{v_i} = G^{\Theta}_{ij}` respectively, appearing in additional terms appended to Equation (\ref{eq:qsw}) outside the scope of :math:`\omega`. An L-QSW incorporating both absorptive and emissive processes is then succinctly expressed as,
+
+.. math::
+       :label: eq:qsw_ss
+       
+     \frac{d\rho(t)}{dt} = -\text{i}(1-\omega)[H, \rho(t)] + \omega \sum_{k = 1}^{\tilde{N}^2} \mathcal{D}_k[\rho(t)] \\ 
+     + \sum_{k = 1}^{\tilde{N}^2}\mathcal{D}^{\Gamma}_k[\rho(t)] + \sum_{k = 1} ^{\tilde{N}^2}\mathcal{D}^{\Theta}_k[\rho(t)]
+
+where :math:`k = \tilde{N}(j-1) + i` with :math:`\tilde{N}` equal to :math:`N` plus the total vertices in :math:`V^\Gamma` and :math:`V^\Theta`, and :math:`\rho(t)` is of dimensions :math:`\tilde{N} \times \tilde{N}`. Terms :math:`\mathcal{D}^{\Gamma}_k[\rho(t)]` are defined as per Equation :eq:`eq:KL_eq` with :math:`\tau_k = \Gamma_k` where :math:`\Gamma_k` is the absorption rate from source :math:`v_j \in \mathcal{G}^\Gamma` to vertex :math:`v_i \in \mathcal{G}`. Similarly, in :math:`\mathcal{D}^{\Theta}_k[\rho(t)]`, :math:`\tau_k = \Theta_k` where :math:`\Theta_k` is the emission rate from vertex :math:`v_j \in \mathcal{G}` to sink :math:`v_i \in \mathcal{G}^{\Theta}`. 
 
 .. _sec:g_qsw:
 
