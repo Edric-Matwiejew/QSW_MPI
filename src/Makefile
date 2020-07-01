@@ -19,6 +19,10 @@ else
 	FCFLAGS = -O3 -ffast-math -funroll-loops -mtune=native
 endif
 
+ifeq ($(OPENMP),TRUE)
+	FCFLAGS := $(FCFLAGS) -fopenmp
+endif
+
 EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
 
 OBJDIR := obj
@@ -33,12 +37,13 @@ $(OBJDIR)/%.o: %.f90
 
 # fMPI f2py shared object library.
 $(PYDIR)/fMPI$(EXT_SUFFIX):  $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o operators.o one_norms.o expm.o) $(PYDIR)/foperators$(EXT_SUFFIX) fMPI.f90
-	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -c fMPI.pyf iso_precisions.f90 sparse.f90 operators.f90 one_norms.f90 expm.f90 -m fMPI fMPI.f90
+	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="$(FCFLAGS)" -lgomp -c fMPI.pyf iso_precisions.f90 sparse.f90 operators.f90 one_norms.f90 expm.f90 -m fMPI fMPI.f90 
 	mv fMPI$(EXT_SUFFIX) $(PYDIR)
+
 
 # foperators f2py shared object library.
 $(PYDIR)/foperators$(EXT_SUFFIX): $(addprefix $(OBJDIR)/, iso_precisions.o sparse.o operators.o) foperators.f90
-	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -c foperators.pyf iso_precisions.f90 sparse.f90 operators.f90 -m foperators foperators.f90
+	$(PYTHON_CALL) -m numpy.f2py --f90exec="$(FC)" --f90flags="-I$(OBJDIR) $(FCFLAGS)" -lgomp -c foperators.pyf iso_precisions.f90 sparse.f90 operators.f90 -m foperators foperators.f90
 	mv foperators$(EXT_SUFFIX) $(PYDIR)
 
 # Compile fortran subroutines.

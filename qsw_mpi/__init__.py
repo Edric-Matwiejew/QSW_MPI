@@ -14,9 +14,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 import qsw_mpi.operators
-import qsw_mpi.io
 import qsw_mpi.MPI
-import qsw_mpi.measure
-import qsw_mpi.plot
+import qsw_mpi.fMPI
+import qsw_mpi.foperators
+import qsw_mpi.parallel_io

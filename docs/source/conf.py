@@ -15,7 +15,9 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath("../.."))
 
-autodoc_mock_imports = ["mpi4py", "qsw_mpi.foperators", "qsw_mpi.fMPI"]
+autodoc_mock_imports = ["mpi4py", "qsw_mpi.foperators", "qsw_mpi.fMPI", "qsw_mpi.parallel_io", "h5py"]
+
+numfig = True
 
 #class Mock(MagicMock):
 #    @classmethod
@@ -32,7 +34,7 @@ copyright = '2019, Edric Matwiejew'
 author = 'Edric Matwiejew'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = '1.0.0'
 
 
 # -- General configuration ---------------------------------------------------

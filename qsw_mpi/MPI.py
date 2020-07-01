@@ -20,54 +20,497 @@ from mpi4py import MPI
 import h5py
 import qsw_mpi.operators as operators
 import qsw_mpi.fMPI as fMPI
-import qsw_mpi.io as io
-import time
+from qsw_mpi.operators import nm_pop_inv_map
+import qsw_mpi.parallel_io as pio
+from time import time
 from warnings import warn
 
-def load_walk(
-        omega,
-        filename,
-        MPI_communicator):
-    """ Initialize a previously created :class:`walk` using a .qsw file.
-
-    :param omega: :math:`\omega`
-    :type omega: float
-
-    :param filename: Target .qsw file to open.
-    :type filename: string
-
-    :param MPI_communicator: MPI communicator
-
-    :return: A :class:`walk` object initialized using the input systems's :math:`H`, :math:`L`, sources, and sinks data. The :class:`walk.file` parameter is set to the input file.
-    """
-    H, L, sources, sinks = load_system(filename, MPI_communicator)
-
-    walk_out = walk(omega, H, L, MPI_communicator, sources, sinks)
-    walk_out.File(filename, action = "a")
-
-    return walk_out
-
 class walk(object):
-    """The :class:`walk` object handels the creation of distributed :math:`\mathcal{L}`, :math:`\\rho(0)` and system propagation in an MPI environment. It also enables the saving of results and input data to a .qsw file. This object and its containing methods will only function correctly if called within an MPI instance, as shown in the examples.
 
-    :param omega: :math:`\omega`
+    """
+    The :class:`walk` class provides a framework for Lindbladian quantum walk simulation. This proceeds by creating a :class:`walk` sub-class containing a private method with the signature,
+
+    .. code-block:: python
+
+        def _construct_superoperator(self):
+
+    which is responsible for defining:
+
+    * self.SO_nnz (integer): The number of non-zeros in :math:`\\tilde{\mathcal{L}}`
+    * self.SO_rows (integer): The global number of rows in :math:`\\tilde{\mathcal{L}}`
+    * self.partition_table (integer array): A 1-based array describing the number of :math:`\\tilde{\mathcal{L}}` rows per MPI rank.
+
+        :Example:
+            | An evenly distributed :math:`\\tilde{\mathcal{L}}` with an MPI communicator of size of 4 and self.SO_nnz = 16 would have,
+            |
+            | self.partition_table = [1,5,9,13,17]
+            |
+            | where the number of rows at MPI rank i (self.SO_local_rows) is equal to self.partition_table[i + 1] - self.partition_table[i]
+
+    * self.SO_local_rows (integer) the number of :math:`\\tilde{\mathcal{L}}` stored locally, :math:`N_\\text{local}`.
+    * self.SO_n_row_starts (:math:`N_\\text{local} + 1` integer NumPy array): Local partition of the 1-based row index pointer array for :math:`\\tilde{\mathcal{L}}`, part of the CSR matrix format.
+    * self.SO_col_indexes (:math:`N_\\text{local}` integer NumPy array): Local partition of the 1-based column index array for :math:`\\tilde{\mathcal{L}}`, part of the CSR matrix format.
+    * self.SO_values (:math:`N_\\text{local}` complex NumPy array): Local partition of non-zero values corresponding to self.SO_col_indexes (in 1-based indexing) for :math:`\\tilde{\mathcal{L}}`, part of the CSR matrix format.
+
+    * self.size (integer tuple): Dimensions of :math:`\\rho(t), H`, Lindblad and other non-vectorised operators.
+    * self.MPI_communicator: MPI communicator object as defined by mpi4py.
+    * self.rank (integer): MPI process rank
+
+
+    :meth:`_construct_superoperator()` must be called in the '__init__' function of the :class:`walk` subclass, followed by a call to the `__init__` method of the parent class:
+
+    .. code-block:: python
+
+        super().__init__()
+
+    The following :class:`walk` sub-classes are defined in QSW_MPI:
+
+    * :class:`LQSW`: QSWs with locally interacting Lindbad operators.
+    * :class:`GQSW`: QSWs with globally interacting Lindblad operators (including non-moralising QSWs).
+    * :class:`GKSL`: Quantum walks defined using the diagonal form of the GKSL equation.
+    """
+
+    def __init__(self):
+
+        self.parallel_io = False
+        self.local_result = None
+        self._reconcile_mpi_communications()
+        self._superoperator_one_norms()
+
+    def _matricize_index(self, index, offset):
+        """
+        Takes a local index of the distributed :math:`\tilde{\\rho}(t)` and the offset of that index relative to its global position (self.partition_table[self.rank] - 1) and returns the corresponding indexes of :math:`\\rho(t)`.
+        """
+        j = np.int64(np.ceil((1 + index + offset)/self.size[0])) - 1
+        i = np.int64(index + offset - j*self.size[0])
+
+        return i, j
+
+    def _check_dataset_name(self, File, dataset_name, action):
+        """
+        Checks if a dataset already exists in a HDF5 file, if so, '_' is append to the input name.
+        """
+
+        if (action == "w") or not (dataset_name in File):
+            return dataset_name
+
+        else:
+            return dataset_name + '_'
+
+    def _reconcile_mpi_communications(self):
+        """
+        Analyses the structure of :math:`\\tilde{\mathcal{L}}` to optimise MPI communication of :math:`\\tilde{\\rho}(t)` during sparse-matrix multiplication. 
+        """
+        self.rec_time = time()
+
+        self.SO_num_rec_inds, self.SO_rec_disps, self.SO_num_send_inds, self.SO_send_disps = fMPI.rec_a(
+                self.SO_rows,
+                self.SO_row_starts,
+                self.SO_col_indexes,
+                self.partition_table,
+                self.MPI_communicator.py2f())
+
+        self.SO_local_col_inds, self.SO_rhs_send_inds = fMPI.rec_b(
+                self.SO_rows,
+                np.sum(self.SO_num_send_inds),
+                self.SO_row_starts,
+                self.SO_col_indexes,
+                self.SO_num_rec_inds,
+                self.SO_rec_disps,
+                self.SO_num_send_inds,
+                self.SO_send_disps,
+                self.partition_table,
+                self.MPI_communicator.py2f())
+
+        self.rec_time = time() - self.rec_time
+
+    def _superoperator_one_norms(self):
+        """
+        Calculates :math:`[\\tilde{\mathcal{L}}^1,...,\\tilde{\mathcal{L}}^9]`, which is used to determine optimal scaling and squaring parameters when calling :meth:`qsw_mpi.MPI.walk.step` and :meth:`qsw_mpi.MPI.walk.series`.
+        """
+        self.one_norms_time = time()
+
+        self.one_norms, self.p = fMPI.one_norm_series(
+                self.SO_rows,
+                self.SO_row_starts,
+                self.SO_col_indexes,
+                self.SO_values,
+                self.SO_num_rec_inds,
+                self.SO_rec_disps,
+                self.SO_num_send_inds,
+                self.SO_send_disps,
+                self.SO_local_col_inds,
+                self.SO_rhs_send_inds,
+                self.partition_table,
+                self.MPI_communicator.py2f())
+
+        self.one_norms_time = time() - self.one_norms_time
+
+    def set_omega(self, omega):
+        """
+        Re-defines :math:`\omega` in the QSW  master equation. This requires that :math:`\\tilde{\mathcal{L}}` be re-built, its communication pattern re-optimised and its one-norm series re-calculated.
+
+        :param omega: Interpolation parameter, :math:`\omega`
+        :type omega: float
+        """
+
+        self.omega = omega
+        self._construct_superoperator()
+        self._reconcile_mpi_communications()
+        self._superoperator_one_norms()
+
+    def initial_state(self, state):
+        """
+        Sets the initial state :math:`\\rho(t_0)` and generates :math:`\\tilde{\\rho}(t_0)`.
+
+        :param state: One of the following:
+
+            * :math:`\\rho(t_0)` as a complex NumPy array.
+
+            * :math:`p(t_0)`. An array describing the diagonal of :math:`\\rho(t_0)` which is then assumed to have no initial inter-vertex coherences.
+        """
+        if not isinstance(state, np.ndarray):
+            state = np.array(state, dtype = np.complex128)
+
+        if len(state.shape) == 2:
+            self.rho = state
+
+        elif len(state.shape) == 1:
+            self.rho = np.diag(state)
+
+        self.rho_v = fMPI.initial_state(
+                self.SO_local_rows,
+                self.rho,
+                self.rank,
+                self.partition_table,
+                self.MPI_communicator.py2f())
+
+    def step(self, t, precision = "dp"):
+        """
+        Calculate :math:`\\rho(t)`. This is done via an implementation of Algorithm 3.2 (without optional balancing or minimisation of the Frobenius norm) as detailed in:
+
+         A. Al-Mohy and N. Higham, SIAM Journal on Scientific Computing 33, 488 (2011).
+
+        :param t: time, :math:`t`.
+        :type t: float
+
+        :param precision: Target precision, accepts "sp" for single precision and "dp" for double precision.
+        :type precision: string, optional
+
+        .. Note::
+           To gather or save :math:`\\rho(t)` or :math:`p(t)`:
+
+           * :meth:`~qsw_mpi.MPI.walk.gather_result`
+           * :meth:`~qsw_mpi.MPI.walk.gather_populations`
+           * :meth:`~qsw_mpi.MPI.walk.save_result`
+           * :meth:`~qsw_mpi.MPI.walk.save_populations`
+        """
+        self.step_time = time()
+
+        self.local_result = fMPI.step(
+                self.SO_rows,
+                self.SO_local_rows,
+                self.SO_row_starts,
+                self.SO_col_indexes,
+                self.SO_values,
+                self.SO_num_rec_inds,
+                self.SO_rec_disps,
+                self.SO_num_send_inds,
+                self.SO_send_disps,
+                self.SO_local_col_inds,
+                self.SO_rhs_send_inds,
+                t,
+                self.rho_v,
+                self.partition_table,
+                self.p,
+                self.one_norms,
+                self.MPI_communicator.py2f(),
+                precision)
+
+        self.step_time = time() - self.step_time
+
+    def series(self, t1, tq, steps, precision = 'dp'):
+        """
+        Calculate :math:`\\rho(t)` over :math:`[t_1, t_q]` (where :math:`t_q > t_1`) at :math:`q` evenly spaced steps with :math:`\Delta t = \\frac{t_q - t_1}{q}`. This is done via an implementation of Algorithm 5.2 (without optional balancing or minimisation of the Frobenius norm) as detailed in:
+
+         A. Al-Mohy and N. Higham, SIAM Journal on Scientific Computing 33, 488 (2011).
+
+        :param t1: Starting time, :math:`t_1`.
+        :type t1: float
+
+        :param tq: Ending time, :math:`t_q`.
+        :type tq: float
+
+        :param steps: :math:`q`.
+        :type steps: integer
+
+        :param precision: Target precision, accepts "sp" for single precision and "dp" for double precision. Defaults to "dp".
+        :type precision: string, optional
+
+        .. Note::
+           To gather or save :math:`(\\rho(t_0),...,\\rho(t_q))` or :math:`(p(t_0),...,p(t_0))`:
+
+           * :meth:`~qsw_mpi.MPI.walk.gather_result`
+           * :meth:`~qsw_mpi.MPI.walk.gather_populations`
+           * :meth:`~qsw_mpi.MPI.walk.save_result`
+           * :meth:`~qsw_mpi.MPI.walk.save_populations`
+        """
+        self.series_time = time()
+
+        self.local_result = fMPI.series(
+                self.SO_rows,
+                self.SO_local_rows,
+                self.SO_row_starts,
+                self.SO_col_indexes,
+                self.SO_values,
+                self.SO_num_rec_inds,
+                self.SO_rec_disps,
+                self.SO_num_send_inds,
+                self.SO_send_disps,
+                self.SO_local_col_inds,
+                self.SO_rhs_send_inds,
+                t1,
+                tq,
+                self.rho_v,
+                steps,
+                self.partition_table,
+                self.p,
+                self.one_norms,
+                self.MPI_communicator.py2f(),
+                precision)
+
+        self.series_time = time() - self.series_time
+
+    def gather_result(self, root = 0):
+        """
+        Gathers :math:`\\rho(t)` or :math:`(\\rho(t_1),...,\\rho(t_q))` following execution of :meth:`qsw_mpi.MPI.walk.step` or :meth:`qsw_mpi.MPI.walk.series` at a specified MPI rank. `None` is returned elsewhere.
+
+        :param root: MPI process rank at which to gather :math:`\\rho(t)` or :math:`(\\rho(t_1),...,\\rho(t_q))`.
+        :type root: integer
+
+        :returns: :math:`\\tilde{N} \\times \\tilde{N}` complex NumPy array at root, otherwise `None`.
+        """
+
+        if self.local_result is not None:
+
+            if self.rank == root:
+                output_size = self.size
+            else:
+                output_size = 1
+
+            if self.local_result.ndim == 1:
+
+                rhot = fMPI.gather_step(
+                        self.local_result,
+                        self.partition_table,
+                        root,
+                        self.MPI_communicator.py2f(),
+                        output_size).T
+
+            else:
+
+                rhot = fMPI.gather_series(
+                            self.local_result,
+                            self.partition_table,
+                            root,
+                            self.MPI_communicator.py2f(),
+                            output_size).T
+
+            return rhot
+
+    def _get_local_populations(self):
+        """
+        Returns portion of :\\vec{p}: corresponding to the local partition of :math:`\\tilde{\mathcal{L}}`.
+        """
+
+        pop_inds = []
+        for k in range(len(self.rho_v)):
+            i, j = self._matricize_index(k, self.partition_table[self.rank] - 1)
+            if i == j:
+                pop_inds.append(k)
+
+        if self.local_result.ndim == 1:
+            return np.take(self.local_result, pop_inds)
+        else:
+            return np.take(self.local_result, pop_inds, axis = 0)
+
+    def gather_populations(self, root = 0):
+        """
+        Gathers :math:`p(t)` or :math:`((p(t_0),...,p(t_q))` following execution of :meth:`qsw_mpi.MPI.walk.step` or :meth:`qsw_mpi.MPI.walk.series` at a specified MPI rank. `None`` is returned elsewhere.
+
+        :param root: MPI process rank at which to gather :math:`p(t)` or :math:`(p(t_1),...,p(t_q))`.
+        :type root: integer
+
+        :returns: :math:`p(t)` or :math:`(p(t_0),...,p(t_q))`.
+        :rtype: :math:`N`, or :math:`(q + 1) \\times N`, complex NumPy array.
+        """
+        if self.local_result.ndim == 1:
+
+            local_populations = self._get_local_populations()
+
+            send_counts = np.array(self.MPI_communicator.gather(len(local_populations),root))
+
+            if self.rank == root:
+                populations = np.empty(np.sum(send_counts), dtype = np.complex128)
+            else:
+                populations = None
+
+            self.MPI_communicator.Gatherv(local_populations, (populations, send_counts), root)
+
+            return populations
+
+        else:
+
+            local_populations = self._get_local_populations()
+
+            send_counts = np.array(self.MPI_communicator.gather(local_populations.shape[0] * local_populations.shape[1], root))
+
+            disps = np.empty(self.flock, dtype = int)
+            disps[:] = 0
+
+            if self.rank == root:
+                for i in range(self.flock - 1):
+                    disps[i + 1] = disps[i] + send_counts[i]
+
+            if self.rank == root:
+                populations = np.empty((self.size[0], self.local_result.shape[1]), dtype = np.complex128)
+            else:
+                populations = None
+
+            self.MPI_communicator.Gatherv(local_populations, [populations, send_counts, disps, MPI.DOUBLE_COMPLEX], root)
+
+            return populations
+
+    def gather_superoperator(self, root = 0):
+        """
+        Gathers :math:`\\tilde{\mathcal{L}}` to the root MPI process as a SciPy CSR matrix.
+
+        :param root: MPI process rank at which to gather :math:`\\tilde{\mathcal{L}}`.
+        :type root: integer
+
+        :returns: :math:`\\tilde{\mathcal{L}}`
+        :rtype: :math:`\\tilde{N}^2 \\times \\tilde{N}^2` SciPY CSR matrix
+        """
+
+        send_counts = np.array(self.MPI_communicator.gather(len(self.SO_values),root))
+
+        rs_send_counts = np.array([self.partition_table[i + 1] - self.partition_table[i] for i in range(self.flock)])
+        rs_send_counts[-1] += 1
+
+        if self.rank == root:
+            M_values = np.empty(np.sum(send_counts), dtype = np.complex128)
+            M_col_indexes = np.empty(np.sum(send_counts), dtype = np.int32)
+            M_row_starts = np.empty(np.sum(rs_send_counts), dtype = np.int32)
+        else:
+            M_values = None
+            M_col_indexes = None
+            M_row_starts = None
+
+        self.MPI_communicator.Gatherv(self.SO_values, (M_values, send_counts), root)
+        self.MPI_communicator.Gatherv(self.SO_col_indexes, (M_col_indexes, send_counts), root)
+
+        if self.rank == self.flock - 1:
+            self.MPI_communicator.Gatherv(self.SO_row_starts[0:len(self.SO_row_starts)], (M_row_starts, rs_send_counts), root)
+        else:
+            self.MPI_communicator.Gatherv(self.SO_row_starts[0:len(self.SO_row_starts) - 1], (M_row_starts, rs_send_counts), root)
+
+        if self.rank == root:
+            return sp.csr_matrix((M_values, M_col_indexes - 1, M_row_starts - 1), (self.SO_rows, self.SO_rows))
+        else:
+            return None
+
+    def save_result(self, filename, walkname, action = 'a'):
+        """
+        Saves :math:`\\rho(t)` or :math:`\\vec{\\rho}(t)` to a HDF5 file.
+
+        :param filename: File basename.
+        :type filename: string
+
+        :param walkname: Group/dataset name for :math:`\\rho(t)` or :math:`\\vec{\\rho}(t)`
+        :type walkname: string
+
+        :param action: File access type, append ('a'), overwrite ('w').
+        :param action: string
+        """
+        if self.parallel_io:
+            pio.save_result(self, filename, walkname, action)
+        else:
+            rhot = self.gather_result()
+
+            if self.rank == 0:
+                with h5py.File(filename + '.h5', action) as f:
+                   f.create_dataset(self._check_dataset_name(f, walkname, action), data = rhot)
+
+    def save_populations(self, filename, popname, action = 'a'):
+        """
+        Saves :math:`p(t)` or :math:`(p(t_1),...,p(t_q))` to a HDF5 file.
+
+        :param filename: File basename.
+        :type filename: string
+
+        :param walkname: Group/dataset name for :math:`p(t)` or :math:`(p(t),...,p(t_q))`.
+        :type walkname: string
+
+        :param action: File access type, append ('a'), overwrite ('w').
+        :param action: string
+        """
+        if self.parallel_io:
+            pio.save_populations(self, filename, popname, action)
+        else:
+
+            populations = self.gather_populations()
+
+            if self.rank == 0:
+                with h5py.File(filename + '.h5', action) as f:
+                    f.create_dataset(popname, data = populations)
+
+    def save_superoperator(self, filename, operatorname, action = 'a'):
+        """
+        Save :math:`\\tilde{\mathcal{L}}` to a HDF5 file as a CSR matrix.
+
+        :param filename: File basename
+        :type filename: string
+
+        :param operatorname: Group/dataset name for :math:`\\tilde{\mathcal{L}}`.
+        :type operatorname: string
+
+        :param action: File access type, append ('a'), overwrite ('w').
+        :type action: string
+        """
+        if self.parallel_io:
+            pio.save_superoperator(self, filename, operatorname, action)
+        else:
+
+            M = self.gather_superoperator()
+
+            if self.rank == 0:
+                with h5py.File(filename + '.h5', action) as f:
+                    f.create_dataset(self._check_dataset_name(f, operatorname + '/indptr', action), data = M.indptr)
+                    f.create_dataset(self._check_dataset_name(f, operatorname + '/indices', action), data = M.indices)
+                    f.create_dataset(self._check_dataset_name(f, operatorname + '/data', action), data = M.data)
+
+class LQSW(walk):
+    """
+    Defines an L-QSW, a QSW with locally interacting Lindblad operators, with or without appended sources and sinks (see Equation :eq:`eq:qsw` or :eq:`eq:qsw_ss`).
+
+    :param omega: Interpolation parameter, :math:`\omega`
     :type omega: float
 
-    :param H: :math:`H`
-    :type H: (N, N), complex
+    :param H: Hamiltonian, :math:`H`
+    :type H: :math:`N \\times N` SciPy CSR
 
-    :param L: :math:`L`
-    :type L: (N, N), complex
+    :param L: :math:`M_L = \sum_k L_k` where the Lindblad operators are defined as in Equation :eq:`eq:lindblad`.
+    :type L: :math:`N \\times N` SciPy CSR
 
-    :param MPI_communicator: MPI communicator
+    :param MPI_communicator: MPI communicator object provided by mpi4py.
 
-    :param sources: Contains a list of  absorption sites and the corresponding absorption rates.
-    :type sources: ([M], [M]), (integer, float), tuple, optional
+    :param sources: Contains a list of absorption sites and the corresponding absorption rates.
+    :type sources: tuple ([integers],[floats]), optional
 
     :param sinks: Contains a list of the emission sites and the corresponding absorption rates.
-    :type sinks: ([M], [M]), (integer, float), tuple, optional
+    :type sinks: tuple ([integers],[floats]), optional
 
-    :return: A :class:`walk` object with a :math:`\mathcal{L}` distributed over an MPI communicator.
+    :return: A :class:`walk` object with a :math:`\\tilde{\mathcal{L}}` distributed over an MPI communicator.
     """
     def __init__(
             self,
@@ -94,8 +537,6 @@ class walk(object):
 
         self.sink_sites = sinks[0]
         self.sink_rates = sinks[1]
-
-        self.filename = None
 
         if (self.source_sites is not None) and (self.sink_sites is not None):
 
@@ -153,21 +594,21 @@ class walk(object):
         if self.sink_sites[-1] > H.shape[0] - 1:
             raise IndexError("Maximum sink site index not in range of H.")
 
-        self.construct_superoperator()
+        self._construct_superoperator()
 
-    def construct_superoperator(self):
-        """A distributed :math:`\mathcal{L}` is constructed on :class:`walk` initialization\
-                or on calling :py:meth:`~freeqsw.MPI.walk.set_omega`. One-norms \
-                of the :math:`\mathcal{L}` power series are calculated for using in \
-                deriving the optimal matrix exponentiation parameters when calling \
-                :py:meth:`~freeqsw.MPI.walk.step` and :py:meth:`~freeqsw.MPI.walk.series`.
-                """
+        super().__init__()
+
+    def _construct_superoperator(self):
+        """
+        Constructs a distributed vectorised L-QSW superoperator, :math:`\\tilde{\mathcal{L}}`.
+        """
 
         if (self.omega < 0) or (self.omega > 1):
             raise ValueError("Parameter omega must satify 0 <= omega =< 1.")
 
-        start = time.time()
-        self.M_nnz, self.M_rows, self.partition_table = fMPI.super_operator_extent(
+        self.construct_time = time()
+
+        self.SO_nnz, self.SO_rows, self.partition_table = fMPI.super_operator_extent(
                 self.omega,
                 self.H.indptr,
                 self.H.indices,
@@ -182,10 +623,10 @@ class walk(object):
                 self.flock,
                 self.MPI_communicator.py2f())
 
-        self.M_local_rows = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
-        self.M_n_row_starts = np.max([2, self.M_local_rows + 1])
+        self.SO_local_rows = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
+        self.SO_n_row_starts = np.max([2, self.SO_local_rows + 1])
 
-        self.M_row_starts, self.M_col_indexes, self.M_values = fMPI.super_operator(
+        self.SO_row_starts, self.SO_col_indexes, self.SO_values = fMPI.super_operator(
                 self.omega,
                 self.H.indptr,
                 self.H.indices,
@@ -197,463 +638,326 @@ class walk(object):
                 self.source_rates,
                 self.sink_sites,
                 self.sink_rates,
-                self.M_nnz,
-                self.M_n_row_starts,
-                self.flock,
+                self.SO_nnz,
+                self.SO_n_row_starts,
                 self.MPI_communicator.py2f())
 
-        finish = time.time()
+        self.construct_time = time() - self.construct_time
 
-        self.construction_time = finish - start
-
-        start = time.time()
-        self.M_num_rec_inds, self.M_rec_disps, self.M_num_send_inds, self.M_send_disps = fMPI.rec_a(
-                self.M_rows,
-                self.M_row_starts,
-                self.M_col_indexes,
-                self.partition_table,
-                self.MPI_communicator.py2f())
-
-        self.M_local_col_inds, self.M_rhs_send_inds = fMPI.rec_b(
-                self.M_rows,
-                np.sum(self.M_num_send_inds),
-                self.M_row_starts,
-                self.M_col_indexes,
-                self.M_num_rec_inds,
-                self.M_rec_disps,
-                self.M_num_send_inds,
-                self.M_send_disps,
-                self.partition_table,
-                self.MPI_communicator.py2f())
-        finish = time.time()
-
-        self.reconcile_time = finish - start
-
-        start = time.time()
-
-        self.one_norms, self.p = fMPI.one_norm_series(
-                self.M_rows,
-                self.M_row_starts,
-                self.M_col_indexes,
-                self.M_values,
-                self.M_num_rec_inds,
-                self.M_rec_disps,
-                self.M_num_send_inds,
-                self.M_send_disps,
-                self.M_local_col_inds,
-                self.M_rhs_send_inds,
-                self.partition_table,
-                self.MPI_communicator.py2f())
-        finish = time.time()
-
-        self.one_norm_time = finish - start
-
-    def set_omega(self, omega):
-        """Re-sets :math:`\omega` in the QSW master equation. This triggers :py:func:`construct_superoperator`.
-
-        :param omega: :math:`\omega`
-        :type omega: float
+    def initial_state(self, state):
         """
-
-
-        self.omega = omega
-        self.construct_superoperator()
-
-    def initial_state(self, state, name = None):
-        """Sets the initial state of :math:`\\rho(0)`.
+        Sets the initial state, :math:`\\rho(t_0)`. For an :class:`~qsw_mpi.MPI.LQSW`, this method accepts additional keyword arguments.
 
         :param state: One of the following:
 
-            * (:math:`\\tilde{N}, \\tilde{N}`) or (N, N), complex,
+            * :math:`\\rho(t_0)` as a complex NumPy array.
 
-            * :math:`\\tilde{N}` or N, complex,  Array describing the diagonal of :math:`\\rho(0)` with no inital inter-vertex coherences.
+            * :math:`p(t_0)`. An array describing the diagonal of :math:`\\rho(t_0)` which is then assumed to have no initial inter-vertex coherences.
 
-            * 'sources' - Evenly distribute the initial state over all specified sources.
+            * 'sources' - Equally distribute :math:`\\rho(t_0)` over all specified sources.
 
-            * 'even' - Evenly distribute the initial state over all sites, including specified sources and sinks.
-
-        :param name: An identifying name for the initial state, for use when saving or loading states from a .qsw file.
-        :type name: string, optional
+            * 'mixed' - Equally distribute :math:`\\rho(t_0)` over all sites, including specified sources and sinks.
         """
 
-        self.initial_state_name = name
-
-        if state is 'sources':
+        if str(state) == 'sources':
             self.rho = np.zeros((self.size[0]), dtype = np.complex128)
             self.rho[-(self.n_sinks + self.n_sources):-self.n_sinks] = np.float64(1)/np.float64(self.n_sources)
             self.rho = np.diag(self.rho)
-            self.initial_state_name = 'sources'
-            self.initial_state_gen = 'FreeQSW'
 
-        elif state is 'even':
+        elif str(state) == 'mixed':
             self.rho = np.full((self.size[0]), np.float64(1)/np.float64(self.size[0]), dtype = np.complex128)
             self.rho = np.diag(self.rho)
-            self.initial_state_name = 'even'
-            self.initial_state_gen = 'FreeQSW'
 
         else:
 
             if not isinstance(state, np.ndarray):
                 state = np.array(state, dtype = np.complex128)
 
-            if len(state.shape) is 2:
+            if len(state.shape) == 2:
                 self.rho = np.concatenate((state, np.zeros((state.shape[0], self.pad))), axis = 1)
                 self.rho = np.concatenate((self.rho, np.zeros((self.pad, self.rho.shape[1]))), axis = 0)
-                self.initial_state_gen = 'User'
 
-            elif len(state.shape) is 1:
+            elif len(state.shape) == 1:
                 self.rho = np.diag(np.concatenate((state, np.zeros((self.pad,))), axis = 0))
-                self.initial_state_gen = 'User'
 
         self.rho_v = fMPI.initial_state(
-                self.M_local_rows,
+                self.SO_local_rows,
                 self.rho,
                 self.rank,
                 self.partition_table,
                 self.MPI_communicator.py2f())
 
-        if self.rank is 0:
+class GKSL(walk):
+    """
+    :class:`~qsw_mpi.MPI.GKSL` provides for the simulation of systems obeying the GKSL master equation in its diagonalised form (see Equation :eq:`eq:gksl`).
 
-            if self.filename is not None:
+    :param H: Hamiltonian, :math:`H`.
+    :type H: :math:`N \\times N` complex SciPy CSR
 
-                output = h5py.File(self.filename + ".qsw", "a")
+    :param Ls: Generalised Lindblad operators :math:`L_k`.
+    :type Ls: :math:`N \\times N` complex SciPy CSR matrix
 
-                if self.initial_state_name is None:
-                    self.initial_state_name = 'rho ' + str(output['initial states'].attrs['counter'])
-                    output['initial states'].attrs['counter'] += 1
+    :param taus: Coefficients :math:`\\tau_k` of the Lindblad operators :math:`L_k` (see Equation :eq:`eq:KL_eq`). If `None`, :math:`\\tau_k = 1`.
+    :type taus: float array, optional
 
-                if self.initial_state_name not in output['initial states']:
-                    output['initial states'].create_dataset(self.initial_state_name, data = self.rho, compression = "gzip")
+    :param MPI_communicator: MPI communicator object provided by mpi4py.
 
-    def File(self, filename, action = "a"):
-        """Associate a .qsw file with the :class:`walk` object.
+    :return: A :class:`walk` object with :math:`\\tilde{\mathcal{L}}` distributed over an MPI communicator.
+    """
+    def __init__(
+            self,
+            H,
+            Ls,
+            MPI_communicator,
+            taus = None):
 
-        If the file does not exist it is created, otherwise it is checked for consistency with the system of the walk. This file \
-        may then be used to automatically save results obtained by :py:meth:`~freeqsw.MPI.walk.step` and :py:meth:`~freeqsw.MPI.walk.series`.
+        self.MPI_communicator = MPI_communicator
+        self.flock = self.MPI_communicator.Get_size()
+        self.rank = self.MPI_communicator.Get_rank()
 
-        :param filename: Filename of the .qsw file, or filename of the .qsw to be created. It must end with a .qsw extension.
+        self.size = H.shape
+
+        if taus is None:
+            self.taus = np.ones(len(Ls))
+        else:
+            self.taus = taus
+
+        self.H = H
+        operators.check_indices(self.H)
+
+        self.Ls = Ls
+
+        for L in Ls:
+            operators.check_indices(L)
+
+        self._construct_superoperator()
+
+        super().__init__()
+
+    def _construct_superoperator(self):
+        """
+        Construct distributed :math:`\\tilde{\mathcal{L}}`.
+        """
+        self.construct_time = time()
+
+        # Pack Ls
+        self.L_data = self.Ls[0].data
+        self.L_indices = self.Ls[0].indices
+        self.L_indptr = self.Ls[0].indptr
+        self.L_nnz = [self.Ls[0].count_nonzero()]
+
+        if len(self.Ls) > 1:
+            for i in range(1,len(self.Ls)):
+                self.L_data = np.concatenate((self.L_data, self.Ls[i].data))
+                self.L_indices = np.concatenate((self.L_indices, self.Ls[i].indices))
+                self.L_indptr = np.concatenate((self.L_indptr, self.Ls[i].indptr))
+                self.L_nnz.append(self.Ls[i].count_nonzero())
+
+        self.SO_nnz, self.SO_rows, self.partition_table = fMPI.generalized_super_operator_extent(
+                self.taus,
+                self.H.indptr,
+                self.H.indices,
+                self.H.data,
+                self.L_nnz,
+                self.L_indptr,
+                self.L_indices,
+                self.L_data,
+                self.flock,
+                self.MPI_communicator.py2f())
+
+        self.SO_local_rows = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
+        self.SO_n_row_starts = np.max([2, self.SO_local_rows + 1])
+
+        self.SO_row_starts, self.SO_col_indexes, self.SO_values = fMPI.generalized_super_operator(
+                self.taus,
+                self.H.indptr,
+                self.H.indices,
+                self.H.data,
+                self.L_nnz,
+                self.L_indptr,
+                self.L_indices,
+                self.L_data,
+                self.partition_table,
+                self.MPI_communicator.py2f(),
+                self.SO_nnz,
+                self.SO_n_row_starts)
+
+        self.construct_time = time() - self.construct_time
+
+        def set_omega(self, omega):
+            warnings.warn("set_omega() not supported by GKSL class, superoperator unchanged.")
+
+class GQSW(walk):
+    """
+    :class:`~qsw_mpi.MPI.GQSW` provides for the simulation of G-QSWs and NM-G-QSWs (see Equations :eq:`eq:L_global` or :eq:`eq:nm_gqsw`).
+
+    :param omega: Interpolation parameter, :math:`\omega`.
+    :type omega: float
+
+    :param H: Hamiltonian, :math:`H`.
+    :type H: :math:`\\tilde{N} \\times \\tilde{N}` SciPy CSR
+
+    :param Ls: Generalised Lindblad operators :math:`L_k`.
+    :type Ls: :math:`\\tilde{N} \\times \\tilde{N}` SciPy CSR matrix
+
+    :param MPI_communicator: MPI communicator object provided by mpi4py.
+
+    :param H_loc: NM-G-QSW only. Hamiltonian acting in the subspaces of :math:`V^D`, produced by :meth:`~qsw_mpi.operators.nm_H_loc` (see Equation :eq:`eq:nm_gqsw`).
+    :type H_loc: :math:`\\tilde{N} \\times \\tilde{N}` SciPy CSR, optional
+
+    :param vsets: NM-G-QSW only. Set of vertex subspaces :math:`V^D` created by :meth:`~qsw_mpi.operators.nm_vsets`, see (Equation :eq:`eq:nm_gqsw`).
+    :type vsets: integer lists, optional
+
+    :return: A :class:`walk` object with a :math:`\\tilde{\mathcal{L}}` distributed over an MPI communicator.
+    """
+    def __init__(
+            self,
+            omega,
+            H,
+            Ls,
+            MPI_communicator,
+            H_loc = None,
+            vsets = None):
+
+        self.MPI_communicator = MPI_communicator
+        self.flock = self.MPI_communicator.Get_size()
+        self.rank = self.MPI_communicator.Get_rank()
+        self.omega = omega
+
+        self.size = H.shape
+
+        self.H = H
+        operators.check_indices(self.H)
+
+        self.Ls = Ls
+
+        for L in Ls:
+            operators.check_indices(L)
+
+        if H_loc is not None:
+            self.H_loc = H_loc
+            operators.check_indices(self.H_loc)
+            self.H_loc_indptr = H_loc.indptr
+            self.H_loc_indices = H_loc.indices
+            self.H_loc_data = H_loc.data
+        else:
+            self.H_loc_indptr = np.zeros(H.shape[0] + 1, dtype = np.int)
+            self.H_loc_indices = np.zeros(1, dtype = np.int)
+            self.H_loc_data = np.zeros(1, dtype = np.complex128)
+
+        self.vsets = vsets
+
+        self._construct_superoperator()
+
+        super().__init__()
+
+    def _construct_superoperator(self):
+        """
+        Construct distributed :math:`\\tilde{\mathcal{L}}` for a G-QSW or NM-G_QW.
+        """
+
+        if (self.omega < 0) or (self.omega > 1):
+            raise ValueError("Parameter omega must satify 0 <= omega =< 1.")
+
+        self.construct_time = time()
+
+        # Pack Ls
+        self.L_data = self.Ls[0].data
+        self.L_indices = self.Ls[0].indices
+        self.L_indptr = self.Ls[0].indptr
+        self.L_nnz = [self.Ls[0].count_nonzero()]
+
+        if len(self.Ls) > 1:
+            for i in range(1,len(self.Ls)):
+                self.L_data = np.concatenate((self.L_data, self.Ls[i].data))
+                self.L_indices = np.concatenate((self.L_indices, self.Ls[i].indices))
+                self.L_indptr = np.concatenate((self.L_indptr, self.Ls[i].indptr))
+                self.L_nnz.append(self.Ls[i].count_nonzero())
+
+        self.SO_nnz, self.SO_rows, self.partition_table = fMPI.demoralized_super_operator_extent(
+                self.omega,
+                self.H.indptr,
+                self.H.indices,
+                self.H.data,
+                self.H_loc_indptr,
+                self.H_loc_indices,
+                self.H_loc_data,
+                self.L_nnz,
+                self.L_indptr,
+                self.L_indices,
+                self.L_data,
+                self.flock,
+                self.MPI_communicator.py2f())
+
+        self.SO_local_rows = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
+        self.SO_n_row_starts = np.max([2, self.SO_local_rows + 1])
+
+        self.SO_row_starts, self.SO_col_indexes, self.SO_values = fMPI.demoralized_super_operator(
+                self.omega,
+                self.H.indptr,
+                self.H.indices,
+                self.H.data,
+                self.H_loc_indptr,
+                self.H_loc_indices,
+                self.H_loc_data,
+                self.L_nnz,
+                self.L_indptr,
+                self.L_indices,
+                self.L_data,
+                self.partition_table,
+                self.MPI_communicator.py2f(),
+                self.SO_nnz,
+                self.SO_n_row_starts)
+
+        self.construct_time = time() - self.construct_time
+
+    def gather_populations(self, root = 0):
+        """
+        Return :math:`p(t)` or :math:`(p(t_0),...,p(t_q))` following a call to :meth:`~qsw_mpi.MPI.walk.step` or :meth:`~qsw_mpi.MPI.walk.series`. In the case of a G-QSW, :math:`p(t)` corresponds to the originating graph :math:`G` (see Equation :eq:`eq:nm_gqsw`).
+
+        :param root: MPI process rank at which to gather :math:`p(t)` or :math:`(p(t_0),...,p(t_q))`.
+        :type root: integer, optional.
+
+        :returns: :math:`p(t)` or :math:`(p(t_0),...,p(t_q))`.
+        :rtype: :math:`N`, or :math:`(q + 1) \\times N`, complex NumPy array.
+        """
+
+        populations = super().gather_populations(root)
+
+        if self.vsets == None:
+            return populations
+
+        if self.rank == root:
+            return nm_pop_inv_map(populations, self.vsets)
+
+    def save_vsets(self, filename, vsetsname, action = 'a'):
+        """
+        Save :math:`V^D` (see Equation :eq:`eq:nm_gqsw`) created by :meth:`~qsw_mpi.operators.nm_vsets` to a HDF5 file. 
+
+        :param filename: File basename.
         :type filename: string
 
-        :param action: "a", open or create file. "w" create file, overwrite if it already exists.
+        :param vsetname: Group/dataset name under which to save :math:`V^D`.
+        :type vsetname: string
+
+        :param action: File access type, append ('a'), overwrite ('w').
         :type action: string
         """
 
-        self.filename = str(filename)
+        if self.rank == 0:
 
-        if self.rank is 0:
-            io.set_file(
-                    self.filename,
-                    self.H,
-                    self.L,
-                    self.source_sites,
-                    self.source_rates,
-                    self.sink_sites,
-                    self.sink_rates,
-                    action)
+            f = h5py.File(filename + '.h5', action)
 
-    def step(self, t, target = None, save = False, name = None, precision = None):
-        """Calculate :math:`\\rho(t)`.
+            savename = self._check_dataset_name(f, vsetsname, action)
 
-        :param t: time.
-        :type t: float
+            for i, v in enumerate(self.vsets):
 
-        :param target: MPI rank to receive :math:`\\rho(t)`.
-        :type target: integer, optional
+                dset = f.create_dataset(
+                        vsetsname + '/' + str(i),
+                        (len(v),),
+                        dtype = np.int)
 
-        :param save: If True, save the result to an associated .qsw file.
-        :type save: boolean, optional
+                dset[:] = np.array(v, dtype = np.int)
 
-        :param name: Name under which to save the result, if None it defaults to 'step + <sequential number>'.
-        :type name: string, optional
+            f.close()
 
-        :param precision: Target precision, accepts "sp" for single precision and "dp" for double precision. Defaults to "dp".
-        :type precision: string, optional
-
-        :return rhot: If **target** is specified the :math:`\\rho(t)` is returned to the target rank.
-        :rtype: (:math:`\\tilde{N}, \\tilde{N}`), complex
-
-        .. warning::
-            At minimum a **target** must be specified, or **save** must be 'True'.
-        """
-
-        if (target is None) and (save is False):
-            raise ValueError("target= None and save=False. No target specified for series result")
-
-        if precision is None:
-            precision = "dp"
-
-        start = time.time()
-
-        rhot_v = fMPI.step(
-                self.M_rows,
-                self.M_row_starts,
-                self.M_col_indexes,
-                self.M_values,
-                self.M_num_rec_inds,
-                self.M_rec_disps,
-                self.M_num_send_inds,
-                self.M_send_disps,
-                self.M_local_col_inds,
-                self.M_rhs_send_inds,
-                t,
-                self.rho_v,
-                self.partition_table,
-                self.p,
-                self.one_norms,
-                self.MPI_communicator.py2f(),
-                precision)
-
-        end = time.time()
-
-        self.step_time = end - start
-
-        if save:
-
-            if self.rank == 0:
-                output_size = self.size
-            else:
-                output_size = 1
-
-            rhot = fMPI.gather_step(
-                    rhot_v,
-                    self.partition_table,
-                    0,
-                    self.MPI_communicator.py2f(),
-                    output_size)
-
-            if self.rank is 0:
-
-                output = h5py.File(self.filename + ".qsw", "a")
-
-                if name is None:
-                    name = 'step ' + str(output['steps'].attrs['counter'])
-                    output['steps'].attrs['counter'] += 1
-
-                step = output['steps'].create_dataset(name, data = rhot, compression = "gzip")
-                step.attrs['omega'] = self.omega
-                step.attrs['t'] = t
-                step.attrs['initial state'] = self.initial_state_name
-                step.attrs['initial state gen'] = self.initial_state_gen
-
-                output.close()
-
-        if target is not None:
-
-            if (not save) or (target is not 0):
-
-                if self.rank == 0:
-                    output_size = self.size
-                else:
-                    output_size = 1
-
-                rhot = fMPI.gather_step(
-                        rhot_v,
-                        self.partition_table,
-                        target,
-                        self.MPI_communicator.py2f(),
-                        output_size)
-
-            return rhot
-
-    def series(self, t1, tq, steps, target = None, save = False, name = None, precision = None, chunk_size = None):
-        """Calculate :math:`\\rho(t)` over :math:`[t_1, t_q]` at :math:`q` evenly spaced steps.
-
-        :param t1: :math:`t_1`.
-        :type t1: float
-
-        :param tq: :math:`t_q`.
-        :type tq: float
-
-        :param steps: :math:`q`.
-        :type steps: integer
-
-        :param target: MPI rank to receive :math:`[\\rho(t_1),\\rho(t_2),...,\\rho(t_q)]`.
-        :type target: integer, optional
-
-        :param save: If True, save the result to an associated .qsw file.
-        :type save: boolean, optional
-
-        :param name: Name under which to save the result, if None it defaults to 'series + <sequential number>'.
-        :type name: string, optional
-
-        :param precision: Target precision, accepts "sp" for single precision and "dp" for double precision. Defaults to "dp".
-        :type precision: string, optional
-
-        :return rhot: If **target** is specified :math:`[\\rho(t_1),\\rho(t_2),...,\\rho(t_q)]` is returned to the target rank.
-        :rtype: (:math:`\\tilde{N}, \\tilde{N}`), complex, array
-
-        .. warning::
-            At minimum a **target** must be specified, or **save** must be 'True'.
-        """
-
-        if (target is None) and (save is False):
-            raise ValueError("target= None and save=False. No target specified for series result")
-
-        if precision is None:
-            precision = "dp"
-
-        if (chunk_size is not None) and (save is False):
-            chunk_size = steps
-            if self.rank == 0:
-                warn('Chunked evaluation used only if save file is specified, defaulting to chunk_size=' + str(steps), UserWarning)
-
-        if (chunk_size is None) and (save is False):
-            chunk_size = steps
-        elif (chunk_size is None) and (save is True):
-            chunk_size = np.rint(float(40**9)/(16*self.H.shape[0]**2))
-
-        chunks = int(np.ceil(steps/float(chunk_size)))
-
-        h = np.float32(tq - t1)/np.float32(steps)
-        chunk_steps = chunk_size
-
-        for i in range(0,chunks):
-
-            t1_chunk = i*chunk_size*h + t1
-
-            if i == (chunks - 1):
-                tq_chunk = tq
-                chunk_steps = int(np.rint((tq_chunk - t1_chunk)/h))
-            else:
-                tq_chunk = (i + 1)*chunk_size*h + t1
-
-            rhot_v_series = fMPI.series(
-                    self.M_rows,
-                    self.M_row_starts,
-                    self.M_col_indexes,
-                    self.M_values,
-                    self.M_num_rec_inds,
-                    self.M_rec_disps,
-                    self.M_num_send_inds,
-                    self.M_send_disps,
-                    self.M_local_col_inds,
-                    self.M_rhs_send_inds,
-                    t1_chunk,
-                    tq_chunk,
-                    self.rho_v,
-                    chunk_steps,
-                    self.partition_table,
-                    self.p,
-                    self.one_norms,
-                    self.MPI_communicator.py2f(),
-                    precision)
-
-            if save:
-
-                if self.rank == 0:
-                    output_size = self.size
-                else:
-                    output_size = 1
-
-                rhot_series = fMPI.gather_series(
-                        rhot_v_series,
-                        self.partition_table,
-                        0,
-                        self.MPI_communicator.py2f(),
-                        output_size)
-
-                if (self.rank == 0) and (i == 0):
-
-                    output = h5py.File(self.filename + ".qsw", "a")
-
-                    if name is None:
-                        name = 'series ' + str(output['series'].attrs['counter'])
-                        output['series'].attrs['counter'] += 1
-
-                    series = output['series'].create_dataset(
-                            name,
-                            data = rhot_series.T,
-                            maxshape = (steps + 1, self.size[0], self.size[0]),
-                            chunks = True,
-                            compression = "gzip")
-
-                    series.attrs['omega'] = self.omega
-                    series.attrs['t1'] = t1
-                    series.attrs['tq'] = tq
-                    series.attrs['steps'] = steps
-                    series.attrs['initial state'] = self.initial_state_name
-                    series.attrs['initial state gen'] = self.initial_state_gen
-                    output.close()
-
-                elif self.rank == 0:
-
-                    output = h5py.File(self.filename + ".qsw", "a")
-                    series = output['series'][name]
-                    series.resize(series.shape[0] + chunk_steps, axis = 0)
-                    series[-chunk_steps:,:,:] = rhot_series.T[1:]
-
-                    output.close()
-
-        if target is not None:
-
-            if (not save) or (target is not 0):
-
-                if self.rank == 0:
-                    output_size = self.size
-                else:
-                    output_size = 1
-
-                rhot_series = fMPI.gather_series(
-                        rhot_v_series,
-                        self.partition_table,
-                        target,
-                        self.MPI_communicator.py2f(),
-                        output_size)
-
-                return rhot_series.T
-
-            else:
-
-                if self.rank == target:
-                    output = h5py.File(self.filename + ".qsw", "r")
-                    rhot_series = output['series'][name][:]
-                    output.close()
-
-                    return rhot_series
-
-def load_system(filename, MPI_communicator):
-    """
-    Load :math:`H`, :math:`L`, sources and sinks stored in a .qsw file and distribute this over an MPI communicator.
-
-    :param filename: Name of the .qsw file.
-    :type filename: string
-
-    :param MPI_communicator: MPI communicator.
-
-    :return: :math:`H`, :math:`L`, sources and sinks.
-    :rtype: (N, N), complex; ([M], [M]), (integer, float), tuple; ([M], [M]), (integer, float), tuple.
-    """
-
-    rank = MPI_communicator.Get_rank()
-
-    if rank == 0:
-        system = io.File(str(io._qsw_extension(filename)))
-        H = system.H()
-        L = system.L()
-        sources = system.sources()
-        sinks = system.sinks()
-        size = H.shape[0]
-        system.close()
-    else:
-        size = None
-        system = None
-        sources = (None, None)
-        sinks = (None, None)
-
-    size = MPI_communicator.bcast(size, root = 0)
-    sources = MPI_communicator.bcast(sources, root=0)
-    sinks = MPI_communicator.bcast(sinks, root=0)
-
-    if rank != 0:
-        H = sp.csr_matrix((size,size), dtype = np.complex128)
-        L = sp.csr_matrix((size,size), dtype = np.complex128)
-
-    H.data = MPI_communicator.bcast(H.data, root = 0)
-    H.indices = MPI_communicator.bcast(H.indices, root = 0)
-    H.indptr = MPI_communicator.bcast(H.indptr, root = 0)
-
-    L.data = MPI_communicator.bcast(L.data, root = 0)
-    L.indices = MPI_communicator.bcast(L.indices, root = 0)
-    L.indptr = MPI_communicator.bcast(L.indptr, root = 0)
-
-    return H, L, sources, sinks

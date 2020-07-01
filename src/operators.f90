@@ -32,44 +32,6 @@ module Operators
     contains
 
     !
-    !   Function: Kronecker_Delta
-    !
-    !>  @brief Kronecker delta function of integers i and j.
-    !
-    !>  @details This function is equal to 1 if i = j and 0 otherwise.
-
-    function Kronecker_Delta(i, j)
-
-        integer :: Kronecker_Delta
-        integer, intent(in) :: i, j
-
-        Kronecker_Delta = int((real((i+j)-abs(i-j)))/(real((i+j)+abs(i-j))))
-
-    end function Kronecker_Delta
-
-    !
-    !   Subroutine: Prefix_Sum
-    !
-    !>  @brief Prefix sum of an integer array.
-    !
-    !>  @details Perfroms an in-place prefix (or cumulative) sum on an integer
-    !>  array.
-    !>
-    !>> Prefix_Sum([1,2,3]) -> [1,3,6]
-
-    subroutine Prefix_Sum(array)
-
-            integer, dimension(:), intent(inout) :: array
-
-            integer :: i
-
-            do i = 2, size(array)
-                array(i) = array(i - 1) + array(i)
-            enddo
-
-    end subroutine Prefix_Sum
-
-    !
     !   Subroutine: Pad_Operator
     !
     !>  @brief Zero-pad a square CSR array.
@@ -211,30 +173,49 @@ module Operators
         integer :: lower_block, upper_block
         complex(dp), dimension(:), allocatable :: value_elements
         complex(dp), dimension(:), allocatable :: value_elements_shifted
-        complex(dp), dimension(:), allocatable :: nz_diag
+        complex(dp), dimension(:), allocatable :: nz_diag, diag_vals
         integer, dimension(:), allocatable :: col_index
         integer, dimension(:), allocatable :: row_start
 
         integer :: lower_offset, upper_offset
 
+        integer :: N
+
         integer :: i, j, k, row, indx
+
+        logical :: diag_hit
 
         lower_block = ceiling(real(lower_bound)/L%rows)
         upper_block = ceiling(real(upper_bound)/L%rows)
 
         allocate(value_elements(L%rows))
         allocate(nz_diag(L%rows))
+        allocate(diag_vals(L%rows**2))
 
         value_elements = 0
         nz_diag = 0
+        diag_vals = 0
+        N = L%rows
 
         do i = 1, L%rows
             do j = L%row_starts(i), L%row_starts(i + 1) - 1
-                value_elements(L%col_indexes(j)) = value_elements(L%col_indexes(j)) &
-                    + conjg(L%values(j))*L%values(j)
                 if (L%col_indexes(j) == i) then
+                    row = (i - 1)*N + i
                     nz_diag(i) = L%values(j)
+                    diag_vals(row) = abs(L%values(j))**2
+                    value_elements(L%col_indexes(j)) = value_elements(L%col_indexes(j)) + &
+                        abs(L%values(j))**2
+                else
+                    value_elements(L%col_indexes(j)) = value_elements(L%col_indexes(j)) + &
+                        abs(L%values(j))**2
                 endif
+            enddo
+        enddo
+
+        do i = 1, N
+             do j = 1, N
+                row = (i - 1)*N + j
+                diag_vals(row) = diag_vals(row) - 0.5*(value_elements(i) + value_elements(j))
             enddo
         enddo
 
@@ -277,6 +258,7 @@ module Operators
         lower_offset = (lower_bound - (lower_block - 1)*L%rows) - 1
         upper_offset = (upper_bound - (upper_block - 1)*L%rows) - L%rows
 
+        diag_hit = .false.
         do i = lower_block, upper_block
             do j = 1 + Kronecker_Delta(i, lower_block)*lower_offset, L%rows &
                 + Kronecker_Delta(i, upper_block)*upper_offset
@@ -291,11 +273,10 @@ module Operators
 
                         if ((L%col_indexes(k) - 1)*L%rows + L%col_indexes(k) == row) then
 
-                            B%values(row_start(row) + indx) =&
-                                -0.5_dp*(value_elements_shifted(mod(row, L%rows)) + &
-                                & value_elements(ceiling(real(row)/real(L%rows)))) + nz_diag(i)**2
+                            B%values(row_start(row) + indx) = diag_vals(row)
                             B%col_indexes(row_start(row) + indx) = &
                                 (L%col_indexes(k) - 1)*L%rows + L%col_indexes(k)
+                            diag_hit = .true.
 
                         else
 
@@ -306,17 +287,24 @@ module Operators
                         endif
 
                         indx = indx + 1
-
                     enddo
+
+                    ! If the Lindblad matrix has zero diagonals.
+                    if (.not. diag_hit) then
+                       if(abs(diag_vals(row)) > epsilon(0.d0)) then
+                        B%values(row_start(row) + indx) = diag_vals(row)
+                        B%col_indexes(row_start(row) + indx) = row
+                        diag_hit = .false.
+                        endif
+                     endif
                 else
 
-                    B%values(row_start(row)) = &
-                        -0.5_dp*(value_elements_shifted(mod(row, L%rows)) + &
-                                & value_elements(ceiling(real(row)/real(L%rows))))
+                    B%values(row_start(row)) = diag_vals(row)
                     B%col_indexes(row_start(row)) = row
 
                 endif
             enddo
+
         enddo
 
         allocate(B%row_starts(lower_bound:upper_bound + 1))
@@ -324,6 +312,8 @@ module Operators
         B%row_starts(lower_bound:upper_bound + 1) = row_start(lower_bound:upper_bound + 1)
         B%rows = upper_bound - lower_bound + 1
         B%columns = L%columns**2
+
+        call Sort_CSR(B)
 
     end subroutine Generate_Scattering_Superoperator
 
@@ -478,7 +468,7 @@ module Operators
 
         do i = 1, A%rows
             do j = A%row_starts(i), A%row_starts(i + 1) - 1
-                out_degrees(i) = out_degrees(i) + gamma*A%values(j)
+                out_degrees(i) = out_degrees(i) + gamma*abs(A%values(j))
             enddo
         enddo
 
@@ -499,7 +489,7 @@ module Operators
 
             elements = A%row_starts(i + 1) - A%row_starts(i)
 
-            if (elements == 0) cycle
+            if ((elements == 0) .and. (abs(out_degrees(i)) < epsilon(0.d0))) cycle
 
             B%col_indexes(B%row_starts(i):B%row_starts(i) + elements - 1) = &
                 A%col_indexes(A%row_starts(i):A%row_starts(i + 1) - 1)
@@ -507,9 +497,10 @@ module Operators
             B%values(B%row_starts(i):B%row_starts(i) + elements - 1) = &
                 -gamma*A%values(A%row_starts(i):A%row_starts(i + 1) - 1)
 
-            B%col_indexes(B%row_starts(i + 1) - 1) = i
-
-            B%values(B%row_starts(i + 1) - 1) = out_degrees(i)
+            if (abs(out_degrees(i)) > epsilon(0.d0)) then
+               B%col_indexes(B%row_starts(i + 1) - 1) = i
+               B%values(B%row_starts(i + 1) - 1) = out_degrees(i)
+            endif
 
         enddo
 
@@ -615,8 +606,8 @@ module Operators
         enddo
 
         do i = 1, size(L%values, 1)
-            out_degrees(L%col_indexes(i)) = out_degrees(L%col_indexes(i)) + &
-                omega*L%values(i)*conjg(L%values(i))
+            out_degrees(l%col_indexes(i)) = out_degrees(l%col_indexes(i)) + &
+                omega*l%values(i)*conjg(l%values(i))
         enddo
 
         do i = 1, N
@@ -810,7 +801,7 @@ module Operators
                     L_aug%values(size(L%col_indexes) + n_sources + n_sinks))
 
         L_aug%rows = L%rows + n_sinks + n_sources
-        L_aug%columns = L_aug%rows + n_sinks + n_sources
+        L_aug%columns = L_aug%rows
 
         L_aug%row_starts(1:L%rows + 1) = L%row_starts(1:L%rows + 1)
         L_aug%row_starts(L%rows + 2:L_aug%rows + 1) = L%row_starts(L%rows + 1)
@@ -1324,6 +1315,572 @@ module Operators
         endif
 
     end subroutine Prepare_Super_Operator
+
+!
+!    Subroutine: COO_Vectorized_Commutator
+!
+!>   @breif Returns HSO = (I \otimes H - H^T \otimes).
+!
+!>   @details Given CSR array H, COO_Vectorized_Commutator returns (I \otimes H - H^T \otimes)
+!>   as a COO matrix. This corresponds to the vectorization mapping,
+!>
+!>>  [H, rho(t)] <-> (I \otimes H - H^T \otimes H)vec(rho(t))
+
+
+    subroutine COO_Vectorized_Commutator(   H, &
+                                            partition_table, &
+                                            HSO, &
+                                            MPI_communicator)
+
+        type(CSR), intent(in) :: H !< @param CSR array.
+        integer, dimension(:), intent(in) :: partition_table !< @param Distributed row partitions.
+        type(COO), intent(inout) :: HSO !< @param COO array.
+        integer, intent(in) :: MPI_communicator !< @param MPI communicator over which to generate HSO
+
+        type(CSR) :: H_T
+        type(COO) :: HSO1, HSO2
+        integer :: HSO1_nnz, HSO2_nnz
+
+        integer :: lower_bound, upper_bound, lower_block, upper_block
+        integer :: lower_offset, upper_offset
+        integer :: local_rows
+        integer :: row_index, col_index
+        integer :: i, j, k
+
+        ! MPI
+        integer :: rank
+        integer :: ierr
+
+        call MPI_comm_rank(MPI_communicator, rank, ierr)
+
+        lower_bound = partition_table(rank + 1)
+        upper_bound = partition_table(rank + 2) - 1
+
+        lower_block = ceiling(real(lower_bound)/H%rows)
+        upper_block = ceiling(real(upper_bound)/H%rows)
+
+        lower_offset = (lower_bound - (lower_block - 1)*H%rows) - 1
+        upper_offset = (upper_bound - (upper_block - 1)*H%rows) - H%rows
+
+        local_rows = upper_bound - lower_bound + 1
+
+        HSO1%rows = H%rows**2
+        HSO1%columns = H%columns**2
+
+        HSO1_nnz = size(H%col_indexes)*(upper_block - lower_block + 2)
+        allocate(HSO1%row_indexes(HSO1_nnz))
+        allocate(HSO1%col_indexes(HSO1_nnz))
+        allocate(HSO1%values(HSO1_nnz))
+
+        do i = lower_block, upper_block
+        do j = 1 + Kronecker_Delta(i, lower_block)*lower_offset, H%rows &
+            + Kronecker_Delta(i, upper_block)*upper_offset
+                do k = H%row_starts(j), H%row_starts(j + 1) - 1
+                    row_index = (i - 1) * H%rows + j
+                    col_index = (i - 1) * H%rows + H%col_indexes(k)
+                    HSO1%nnz = HSO1%nnz + 1
+                    HSO1%row_indexes(HSO1%nnz) = row_index
+                    HSO1%col_indexes(HSO1%nnz) = col_index
+                    HSO1%values(HSO1%nnz) = H%values(k)
+                enddo
+            enddo
+        enddo
+
+        HSO2%rows = H%rows**2
+        HSO2%columns = H%columns**2
+
+        call CSR_Transpose(H, H_T)
+
+        HSO2_nnz = H%rows*maxval(H%row_starts(2:size(H%row_starts)) - &
+            H%row_starts(1:size(H%row_starts)-1))*(upper_block - lower_block + 1)
+
+        allocate(HSO2%row_indexes(HSO2_nnz))
+        allocate(HSO2%col_indexes(HSO2_nnz))
+        allocate(HSO2%values(HSO2_nnz))
+
+        do i = lower_block, upper_block
+            do j = 1 + Kronecker_Delta(i, lower_block)*lower_offset, H%rows &
+                + Kronecker_Delta(i, upper_block)*upper_offset
+                do k = H_T%row_starts(i), H_T%row_starts(i + 1) - 1
+                    row_index = (i - 1)*H_T%rows + j
+                    col_index = (H_T%col_indexes(k) - 1)*H_T%columns + j
+                    HSO2%nnz = HSO2%nnz + 1
+                    HSO2%row_indexes(HSO2%nnz) = row_index
+                    HSO2%col_indexes(HSO2%nnz) = col_index
+                    HSO2%values(HSO2%nnz) = -H_T%values(k)
+                enddo
+            enddo
+        enddo
+
+        call COO_Allocate_Sum(HSO1, HSO2, local_rows, HSO)
+        call COO_Sum(HSO1, HSO2, HSO, partition_table, MPI_communicator)
+
+    end subroutine COO_Vectorized_Commutator
+
+!
+!>    Subroutine: COO_Vectorized_Dissipator
+!
+!>    @brief Returns \tau \sum_{k=1}^{K}(L_k^* \otimes L_k - \frac{1}{2}(I \otimes L_k^dagger L_k + L_k^T L_k^* \otimes I)).
+
+!>    @details Given a list of CSR Lindblad operators, this returns the term responsible for environental interactions in
+!>    the vectorized Lindblad master equation.
+
+    subroutine COO_Vectorized_Dissipator(   taus, &
+                                            Ls, &
+                                            partition_table, &
+                                            LSO, &
+                                            MPI_communicator)
+
+        real(dp), dimension(:), intent(in) :: taus !> @param Lindblad operator coefficients.
+        type(CSR), dimension(:), target, intent(in) :: Ls !> @param Array of CSR Lindblad operators.
+        integer, dimension(:), intent(in) :: partition_table !> @param !> Distributed row partitions.
+        type(COO), intent(inout) :: LSO !> @param COO matrix
+        integer, intent(in) :: MPI_communicator !> @param MPI communicator of which to generate LSO.
+
+        integer :: lower_bound, upper_bound
+        integer :: lower_block, upper_block
+        integer :: lower_offset, upper_offset
+        integer :: local_rows
+
+        integer, dimension(:), allocatable :: row_nnzs
+        integer :: indx
+
+        integer :: i, j, k, ii, ll
+
+        type(CSR), pointer :: L
+
+        !LSO1
+        type(COO) :: LSO1
+        integer :: L_row, L_nz
+        integer :: current_block
+        integer :: col_ind_disp
+        integer :: row_nz
+
+        !LSO2
+        type(COO) :: LSO2_elements
+        type(COO) :: LSO2
+        type(CSR) :: L_T
+        integer :: lb_indx, ub_indx
+        integer :: offset
+        integer :: col_index, row_index
+        complex(dp) :: value
+
+        !LSO3
+        type(COO) :: LSO3_elements
+        type(COO) :: LSO3
+        integer :: row_indx
+        integer :: cnt
+
+        type(COO) :: LSO_temp_1, LSO_temp_2, LSO_temp_3
+
+        ! MPI
+        integer :: rank
+        integer :: ierr
+
+        call MPI_comm_rank(MPI_communicator, rank, ierr)
+
+        lower_bound = partition_table(rank + 1)
+        upper_bound = partition_table(rank + 2) - 1
+
+        lower_block = ceiling(real(lower_bound)/Ls(1)%rows)
+        upper_block = ceiling(real(upper_bound)/Ls(1)%rows)
+
+        lower_offset = (lower_bound - (lower_block - 1)*Ls(1)%rows) - 1
+        upper_offset = (upper_bound - (upper_block - 1)*Ls(1)%rows) - Ls(1)%rows
+
+        local_rows = upper_bound - lower_bound + 1
+
+        allocate(row_nnzs(lower_bound:upper_bound))
+
+
+        do ii = 1, size(Ls, 1)
+
+            row_nnzs = 0
+
+            L => Ls(ii)
+
+            LSO1%rows = L%rows**2
+            LSO1%columns = L%columns**2
+            allocate(LSO1%col_indexes(size(L%col_indexes)**2 + L%rows*LSO1%rows))
+            allocate(LSO1%row_indexes(size(L%col_indexes)**2 + L%rows*LSO1%rows))
+            allocate(LSO1%values(size(L%col_indexes)**2 + L%rows*LSO1%rows))
+
+            indx = 1
+
+            do i = lower_bound, upper_bound
+                L_row = i - (ceiling(i/float(L%rows)) - 1)*L%rows
+                L_nz = L%row_starts(L_row + 1) - L%row_starts(L_row)
+                current_block = ceiling(real(i)/L%rows)
+                col_ind_disp = 0
+                row_nz = L%row_starts(current_block + 1) - L%row_starts(current_block)
+                do j = 1, L%columns
+                   if (L%row_starts(current_block + 1) - L%row_starts(current_block) == 0) exit
+                    if (L%col_indexes(L%row_starts(current_block) + col_ind_disp) == j) then
+                        row_nnzs(i) = row_nnzs(i) + L%row_starts(L_row + 1) - L%row_starts(L_row)
+                        do k = L%row_starts(L_row), L%row_starts(L_row + 1) - 1
+                            LSO1%row_indexes(indx) = i
+                            LSO1%col_indexes(indx)  = (j - 1)*L%rows + L%col_indexes(k)
+                            LSO1%values(indx) = conjg(L%values(L%row_starts(current_block) &
+                                                    + col_ind_disp)) * L%values(k)
+                            LSO1%nnz = LSO1%nnz + 1
+                            indx = indx + 1
+                        enddo
+                        col_ind_disp = col_ind_disp + 1
+                        if (col_ind_disp == row_nz) exit
+                    endif
+                enddo
+            enddo
+
+            call CSR_Transpose(L, L_T)
+
+            allocate(LSO2_elements%row_indexes(L%rows**2))
+            allocate(LSO2_elements%col_indexes(L%rows**2))
+            allocate(LSO2_elements%values(L%rows**2))
+
+            lb_indx = 0
+            ub_indx = 0
+
+            do i = 1, L%rows
+                do j = 1, L%rows
+                    value = 0
+                    do k = L_T%row_starts(i), L_T%row_starts(i + 1) - 1
+                        do ll = L_T%row_starts(j), L_T%row_starts(j + 1) - 1
+                            if(L_T%col_indexes(ll) == L_T%col_indexes(k)) then
+                                value = value + conjg(L_T%values(k))*L_T%values(ll)
+                            endif
+                            if(L_T%col_indexes(ll) > L_T%col_indexes(k)) exit
+                        enddo
+                    enddo
+                    if (abs(value) > epsilon(real(value))) then
+                            LSO2_elements%nnz = LSO2_elements%nnz + 1
+                            LSO2_elements%row_indexes(LSO2_elements%nnz) = i
+                            LSO2_elements%col_indexes(LSO2_elements%nnz)  = j
+                            LSO2_elements%values(LSO2_elements%nnz) = value
+                        if(((1 + lower_offset) == i) &
+                            .and. (lb_indx == 0)) then
+                            lb_indx = LSO2_elements%nnz
+                        endif
+                    endif
+
+                    if(((L%rows + upper_offset) == i) &
+                            .and. (L%rows == j)) then
+                        ub_indx = LSO2_elements%nnz
+                    endif
+                enddo
+            enddo
+
+        if (lb_indx == 0) then
+            lb_indx = 1
+        endif
+
+        allocate(LSO2%row_indexes(LSO2_elements%nnz*(upper_block - lower_block + 1)*2))
+        allocate(LSO2%col_indexes(LSO2_elements%nnz*(upper_block - lower_block + 1)*2))
+        allocate(LSO2%values(LSO2_elements%nnz*(upper_block - lower_block + 1)*2))
+
+        indx = 1
+        do i = lower_block, upper_block
+            if (i == lower_block) then
+                offset = lb_indx
+            else
+                offset = 1
+            endif
+            do j = offset, LSO2_elements%nnz
+                row_index = (i-1)*L%rows + LSO2_elements%row_indexes(j)
+                col_index = (i-1)*L%columns + LSO2_elements%col_indexes(j)
+
+                LSO2%nnz = LSO2%nnz + 1
+
+                LSO2%row_indexes(LSO2%nnz) = row_index
+                LSO2%col_indexes(LSO2%nnz) = col_index
+                LSO2%values(LSO2%nnz) = -0.5d0 * LSO2_elements%values(j)
+                if ((i == upper_block) .and. (j == ub_indx)) exit
+
+            enddo
+        enddo
+
+            call COO_Allocate_Sum(LSO1, LSO2, local_rows, LSO_temp_1)
+            call COO_Sum(LSO1, LSO2, LSO_temp_1, partition_table, MPI_communicator)
+
+            call COO_Deallocate(LSO1)
+            call COO_Deallocate(LSO2)
+            call COO_Deallocate(LSO2_elements)
+
+
+            allocate(LSO3_elements%row_indexes(L%rows**2))
+            allocate(LSO3_elements%col_indexes(L%rows**2))
+            allocate(LSO3_elements%values(L%rows**2))
+
+            do i = lower_block, upper_block
+                do j = 1, L%rows
+                    value = 0
+                    do k = L_T%row_starts(i), L_T%row_starts(i + 1) - 1
+                        do ll = L_T%row_starts(j), L_T%row_starts(j + 1) - 1
+                            if(L_T%col_indexes(ll) == L_T%col_indexes(k)) then
+                                value = value + L_T%values(k)*conjg(L_T%values(ll))
+                            endif
+                            if(L_T%col_indexes(ll) > L_T%col_indexes(k)) exit
+                        enddo
+                    enddo
+                    if (abs(value) > epsilon(real(value))) then
+                        LSO3_elements%nnz = LSO3_elements%nnz + 1
+                        LSO3_elements%row_indexes(LSO3_elements%nnz) = i
+                        LSO3_elements%col_indexes(LSO3_elements%nnz) = j
+                        LSO3_elements%values(LSO3_elements%nnz) = value
+                    endif
+                enddo
+            enddo
+
+            allocate(LSO3%row_indexes(LSO3_elements%nnz*L%rows))
+            allocate(LSO3%col_indexes(LSO3_elements%nnz*L%rows))
+            allocate(LSO3%values(LSO3_elements%nnz*L%rows))
+
+            indx = 1
+            do i = lower_block, upper_block
+                cnt = 0
+                row_indx = indx
+                do while(indx <= LSO3_elements%nnz)
+                    if (LSO3_elements%row_indexes(indx) /= i) exit
+                    row_index = (LSO3_elements%row_indexes(indx) - 1) * L%rows + 1 + lower_offset * &
+                        Kronecker_Delta(i, lower_block)
+                    col_index = (LSO3_elements%col_indexes(indx) - 1) * L%columns + 1 + lower_offset * &
+                        Kronecker_Delta(i, lower_block)
+                    value = -0.5d0 * LSO3_elements%values(indx)
+                    LSO3%nnz = LSO3%nnz + 1
+                    LSO3%row_indexes(LSO3%nnz) = row_index
+                    LSO3%col_indexes(LSO3%nnz) = col_index
+                    LSO3%values(LSO3%nnz) = value
+                    cnt = cnt + 1
+                    indx = indx + 1
+                enddo
+                if (cnt /= 0) then
+                    do j = 2 + Kronecker_Delta(i, lower_block)*lower_offset, L%rows &
+                        + Kronecker_Delta(i, upper_block)*upper_offset
+                    indx = row_indx
+                    row_index = (LSO3_elements%row_indexes(indx) - 1) * L%rows + j
+                        do k = 1, cnt
+                            col_index = (LSO3_elements%col_indexes(indx) - 1) * L%columns + j
+                            value = -0.5d0 * LSO3_elements%values(indx)
+                            LSO3%nnz = LSO3%nnz + 1
+                            LSO3%row_indexes(LSO3%nnz) = row_index
+                            LSO3%col_indexes(LSO3%nnz) = col_index
+                            LSO3%values(LSO3%nnz) = value
+                            indx = indx + 1
+                        enddo
+                    enddo
+                endif
+            enddo
+
+            call COO_Deallocate(LSO3_elements)
+
+            call COO_Allocate_Sum(LSO_temp_1, LSO3, local_rows, LSO_temp_2)
+            call COO_Sum(LSO_temp_1, LSO3, LSO_temp_2, partition_table, MPI_communicator)
+
+            call COO_Deallocate(LSO_temp_1)
+            call COO_Deallocate(LSO3)
+
+            if (size(Ls) > 1) then
+
+                if (ii == 1) then
+
+                    call COO_Move(LSO_temp_2, LSO)
+                    LSO%values = taus(ii)*LSO%values
+
+                else
+
+                    call COO_Move(LSO, LSO_temp_3)
+
+                    call COO_Allocate_Sum(LSO_temp_2, LSO_temp_3, local_rows, LSO)
+                    call COO_Sum(LSO_temp_2, LSO_temp_3, LSO, partition_table, MPI_communicator)
+
+                    call COO_Deallocate(LSO_temp_2)
+                    call COO_Deallocate(LSO_temp_3)
+
+                    LSO%values = taus(ii)*LSO%values
+
+                endif
+
+            else
+
+                call COO_Move(LSO_temp_2, LSO)
+
+                LSO%values = taus(ii)*LSO%values
+
+            endif
+
+        enddo
+
+    end subroutine COO_Vectorized_Dissipator
+
+!>    Subroutine: Generalized_Superoperator
+!
+!>    @brief Returns the superoperator resulting from vectorization of the Lindblad master equation given
+!>    arbitrary Lindblad operators.
+!
+!>    @details Returns as a distributed CSR array:
+!>
+!>>   \text{i}(I \otimes H - H^T \otimes I)
+!>>   + \tau_k \sum_{k=1}^K(L_k^* \otimes L_k - \frac{1}{2}(I \otimes L_k^\dagger L_k + L_k^T L_k^* \otimes I))
+
+    subroutine Generalized_Superoperator(   taus, &
+                                            H, &
+                                            Ls, &
+                                            partition_table, &
+                                            SO, &
+                                            MPI_communicator)
+
+        real(dp), dimension(:), intent(in) :: taus !> @param Lindblad operator coefficients.
+        type(CSR), intent(in) :: H !> CSR matrix Hamiltonian.
+        type(CSR), dimension(:), target, intent(in) :: Ls !> CSR array of Lindblad operators.
+        integer, dimension(:), intent(in) :: partition_table !> Distributed row partitions.
+        type(CSR), intent(inout) :: SO !> CSR matrix superoperator.
+        integer, intent(in) :: MPI_communicator !> MPI communicator over which to generate SO.
+
+        integer :: local_rows
+
+        type(COO) :: HSO
+        type(COO) :: LSO
+
+        type(COO) :: SO_COO
+
+        ! MPI
+        integer :: rank
+        integer :: ierr
+
+        call MPI_comm_rank(MPI_communicator, rank, ierr)
+
+        local_rows = partition_table(rank + 2) - partition_table(rank +1)
+
+        call COO_Vectorized_Commutator( H, &
+                                        partition_table, &
+                                        HSO, &
+                                        MPI_communicator)
+
+        HSO%values = cmplx(0.0d0, -1.0d0,dp) * HSO%values
+
+        call COO_Vectorized_Dissipator( taus, &
+                                        Ls, &
+                                        partition_table, &
+                                        LSO, &
+                                        MPI_communicator)
+        call COO_Allocate_Sum(HSO, LSO, local_rows, SO_COO)
+        call COO_Sum(HSO, LSO, SO_COO, partition_table, MPI_communicator)
+        call COO_Deallocate(HSO)
+        call COO_Deallocate(LSO)
+
+        call COO_to_CSR(SO_COO, SO, partition_table, MPI_communicator)
+
+    end subroutine Generalized_Superoperator
+
+!>    Subroutine: Demoralized_Superoperator
+!
+!>    @brief Returns the superoperator resulting from vectorization of the non-moralizing
+!>    quantum stochastic walk mater equation.
+!
+!>    @details Returns, as a CSR array,
+!>
+!>>    \tilde{\mathcal{L}} = (I \otimes H - H^T \otimes H) + 
+!>>    + \omega ((I \otimes H_\text{loc} - H_\text{loc}^T \otimes H_\text{loc})
+!>>    + \sum_{k=1}^K(L_k^* \otimes L_k - \frac{1}{2}(I \otimes L_k^\dagger L_k + L_k^T L_k^* \otimes I)))
+!>
+!>    Where H, H_\text{loc} and L_k are CSR arrays corresponding to a demoralised graph.
+
+    subroutine Demoralized_Superoperator(   omega, &
+                                            H, &
+                                            H_loc, &
+                                            Ls, &
+                                            partition_table, &
+                                            SO, &
+                                            MPI_communicator)
+
+        real(dp), intent(in) :: omega
+        type(CSR), intent(in) :: H
+        type(CSR), intent(in) :: H_loc
+        type(CSR), dimension(:), target, intent(in) :: Ls
+        integer, dimension(:), intent(in) :: partition_table
+        type(CSR), intent(inout) :: SO
+        integer, intent(in) :: MPI_communicator
+
+        type(COO), target :: HSO
+        type(COO), target :: HSO_loc
+        type(COO), target :: LSO
+        type(COO), pointer :: SO_COO_temp => null()
+        type(COO), pointer :: SO_COO => null()
+
+        real(dp), dimension(:), allocatable :: taus
+
+        integer :: local_rows
+
+        ! MPI
+        integer :: ierr
+        integer :: rank
+
+        call MPI_comm_rank(MPI_communicator, rank, ierr)
+
+        local_rows = partition_table(rank + 2) - partition_table(rank + 1)
+
+        allocate(taus(size(Ls, 1)))
+
+        taus = omega
+
+        if ((1.d0-omega) > epsilon(omega)) then
+
+            call COO_Vectorized_Commutator( H, &
+                                            partition_table, &
+                                            HSO, &
+                                            MPI_communicator)
+
+            HSO%values = cmplx(0.0d0, omega - 1.0d0, dp) * HSO%values
+
+        endif
+
+        if (omega > epsilon(omega)) then
+
+            call COO_Vectorized_Dissipator( taus, &
+                                            Ls, &
+                                            partition_table, &
+                                            LSO, &
+                                            MPI_communicator)
+
+            if (H_loc%row_starts(H_loc%rows + 1) > 1) then
+
+                call COO_Vectorized_Commutator( H_loc, &
+                                                partition_table, &
+                                                HSO_loc, &
+                                                MPI_communicator)
+
+                HSO_loc%values = -cmplx(0.0d0, omega, dp) * HSO_loc%values
+
+                allocate(SO_COO_temp)
+                call COO_Allocate_Sum(HSO_loc, LSO, local_rows, SO_COO_temp)
+                call COO_Sum(HSO_loc, LSO, SO_COO_temp, partition_table, MPI_communicator)
+                call COO_Deallocate(HSO_loc)
+                call COO_Deallocate(LSO)
+
+            else
+
+               SO_COO_temp => LSO
+
+            endif
+
+        endif
+
+        if (((1.d0 - omega) > epsilon(omega)) .and. (omega > epsilon(omega))) then
+            allocate(SO_COO)
+            call COO_Allocate_Sum(SO_COO_temp, HSO, local_rows, SO_COO)
+            call COO_Sum(SO_COO_temp, HSO, SO_COO, partition_table, MPI_communicator)
+            call COO_Deallocate(SO_COO_temp)
+            call COO_Deallocate(HSO)
+        elseif ((1.d0 - omega) > epsilon(omega)) then
+            SO_COO => HSO
+        elseif (omega > epsilon(omega)) then
+            SO_COO => SO_COO_temp
+        endif
+
+        call COO_to_CSR(SO_COO, SO, partition_table, MPI_communicator)
+
+        call COO_Deallocate(SO_COO)
+
+    end subroutine Demoralized_Superoperator
 
     !
     !   Subroutine: Vectorize_Operator

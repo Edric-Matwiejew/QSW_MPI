@@ -58,8 +58,8 @@ subroutine graph(   gamma, &
 
     nnz_out = size(B%col_indexes)
 
-    col_indexes_out = B%col_indexes - 1
-    values_out = B%values
+    col_indexes_out(1:nnz_out) = B%col_indexes - 1
+    values_out(1:nnz_out) = B%values
     row_starts_out = B%row_starts - 1
 
     deallocate(A%row_starts, A%col_indexes, A%values)
@@ -135,7 +135,7 @@ subroutine symmetrise(  rows, &
 
     complex(8), dimension(nnz) :: values_temp
 
-    type(CSR) :: A, B
+    type(CSR) :: A
 
     allocate(A%row_starts(rows + 1))
     allocate(A%col_indexes(nnz))
