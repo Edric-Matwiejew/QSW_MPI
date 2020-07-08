@@ -18,7 +18,7 @@ from scipy.optimize import least_squares as leastsq
 from scipy import integrate
 
 # Matplotlib parameters.
-#matplotlib.use("Agg")
+matplotlib.use("TkAgg")
 plt.rcParams.update({'font.size': 20})
 plt.rcParams.update({'figure.autolayout': True})
 
@@ -134,6 +134,8 @@ def objective(dimer_params):
     """
     Where we will optimise over parameters V, Gamma and gamma,
     """
+    global network, dimer
+
     V = dimer_params[0]
     Gamma = dimer_params[1]
     gamma = dimer_params[2]
@@ -156,8 +158,8 @@ def objective(dimer_params):
         plt.ylabel(r'$\eta(\omega)$')
         plt.xlim(0,1.1)
         plt.xticks(ticks = [0,0.2,0.4,0.6,0.8,1.0])
-        plt.plot(omegas, EST, 'o', label = "Network")
-        plt.plot(omegas, EST_dimer, '+', label = "Dimer")
+        network = plt.plot(omegas, EST, 'o', label = "Network")
+        dimer = plt.plot(omegas, EST_dimer, '+', label = "Dimer")
         plt.pause(0.01)
 
     return EST_dimer - EST
@@ -172,9 +174,10 @@ plt.figure(figsize=(5,4))
 
 result = leastsq(objective,[V,gamma,Gamma], bounds = (10e-13, np.inf), xtol = 10e-8, ftol = 10e-8)
 
-plt.legend()
-plt.savefig('3_dimer_fit', dpi = 300)
-plt.close()
-
 if rank == 0:
+
     print(result)
+
+    plt.legend()
+    plt.savefig('3_dimer_fit', dpi = 300)
+    plt.close()
