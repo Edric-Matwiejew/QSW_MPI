@@ -175,9 +175,7 @@ plt.figure(figsize=(5,4))
 result = leastsq(objective,[V,gamma,Gamma], bounds = (10e-13, np.inf), xtol = 10e-8, ftol = 10e-8)
 
 if rank == 0:
-
     print(result)
-
     plt.legend()
     plt.savefig('3_dimer_fit', dpi = 300)
     plt.close()
