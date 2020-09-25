@@ -1570,7 +1570,7 @@ module Operators
             enddo
 
         if (lb_indx == 0) then
-            lb_indx = 1
+            lb_indx = LSO2_elements%nnz + 1
         endif
 
         allocate(LSO2%row_indexes(LSO2_elements%nnz*(upper_block - lower_block + 1)*2))
@@ -1594,7 +1594,6 @@ module Operators
                 LSO2%col_indexes(LSO2%nnz) = col_index
                 LSO2%values(LSO2%nnz) = -0.5d0 * LSO2_elements%values(j)
                 if ((i == upper_block) .and. (j == ub_indx)) exit
-
             enddo
         enddo
 
