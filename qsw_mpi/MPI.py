@@ -176,7 +176,7 @@ class walk(object):
 
             if isinstance(state, str):
 
-                if str(state) == 'mixed':
+                if state == 'mixed':
                     self.rho = np.full((self.size[0]), np.float64(1)/np.float64(self.size[0]), dtype = np.complex128)
                     self.rho = np.diag(self.rho)
                     self.rho_set = True
@@ -684,13 +684,15 @@ class LQSW(walk):
 
         self.rho_set = False
 
-        if str(state) == 'sources':
-            self.rho = np.zeros((self.size[0]), dtype = np.complex128)
-            self.rho[-(self.n_sinks + self.n_sources):-self.n_sinks] = np.float64(1)/np.float64(self.n_sources)
-            self.rho = np.diag(self.rho)
-            self.rho_set = True
+        if isinstance(state, str):
 
-        else:
+            if state == 'sources':
+                self.rho = np.zeros((self.size[0]), dtype = np.complex128)
+                self.rho[-(self.n_sinks + self.n_sources):-self.n_sinks] = np.float64(1)/np.float64(self.n_sources)
+                self.rho = np.diag(self.rho)
+                self.rho_set = True
+
+        elif not isinstance(state, str):
 
             if not isinstance(state, np.ndarray):
                 state = np.array(state, dtype = np.complex128)
