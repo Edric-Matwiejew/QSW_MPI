@@ -14,7 +14,7 @@ Added
 Fixed
 -----
 
-* Fixed incorrect superoperator generation when using the :class:`~qsw_mpi.MPI.GQSW` class which occured when a global Lindblad operator had an empty row aligning with the first row of the local partition of the :math:`L^TL^* \otimes I_N` term in :math:`\tilde{\mathcal{L}}`.
+* Fixed incorrect superoperator generation when using the :class:`~qsw_mpi.MPI.GQSW` class which occurred when a global Lindblad operator had an empty row aligning with the first row of the local partition of the :math:`L^TL^* \otimes I_N` term in :math:`\tilde{\mathcal{L}}`.
 * Edited the 'Theory' and 'Package Overview' sections of the package documentation to be in line with reviewer comments on the corresponding journal article.
 
 Changed
