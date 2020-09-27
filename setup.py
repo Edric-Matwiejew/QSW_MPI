@@ -14,7 +14,7 @@ URL = 'https://github.com/Edric-Matwiejew/QSW_MPI'
 EMAIL = '21469154@student.uwa.edu.au'
 AUTHOR = 'Edric Matwiejew'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 
 # What packages are required for this module to be exeuted?
 REQUIRED = [
