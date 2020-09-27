@@ -13,7 +13,7 @@ import matplotlib
 
 # Matplotlib parameters.
 matplotlib.use("Agg")
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 18})
 plt.rcParams.update({'figure.autolayout': True})
 """
 As this system is small, only 1 MPI node will be used.
@@ -198,10 +198,15 @@ if comm.Get_rank() == 0:
     higher transfer of probability to the sink vertex and does not as
     readily decay to a quasi-stationary state.
     """
-    plt.figure(figsize=(5,4))
-    plt.xlabel('t')
-    plt.ylabel(r'$p_{v_3}(t)$')
+    plt.figure(figsize=(5,4.7))
+    plt.xlabel('t', fontsize = 20)
+    plt.ylabel(r'$p_{v_3}(t)$', fontsize = 20)
     plt.xticks(ticks=[0,250,500],labels=[0,12.5,25])
+    plt.yticks(ticks=[0,0.5,1])
     plt.plot(qsw_mpi.operators.nm_measure(anm_GQSW_rho_t,vsets)[2,:])
-    plt.plot(np.real(aQSW_rho_t[2,:]))
-    plt.savefig('1_sink_dynamics',dpi=300)
+    plt.plot(np.real(aQSW_rho_t[2,:]), '--')
+    plt.savefig(
+            '1_sink_dynamics',
+            dpi=300,
+            bbox_inches='tight',
+            pad_inches = 0.05)

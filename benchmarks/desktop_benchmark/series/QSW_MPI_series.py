@@ -15,7 +15,7 @@ def benchmark(omega, t1, t2, steps, files, files_sym, results, max_sim_time):
     total_sim_time = 0.0
 
     for f, fs in zip(files, files_sym):
-
+        print(fs,flush=True)
         G = csr(mmread(fs))
         L = csr(mmread(f))
 
@@ -43,14 +43,13 @@ def benchmark(omega, t1, t2, steps, files, files_sym, results, max_sim_time):
             diff_min_imag = []
         for i in range(steps):
             QSW.step(t1 + i*(t2-t1)/steps)
+
             rho_t = QSW.gather_result()
             step_time_temp = comm.reduce(QSW.step_time, MPI.MAX, 0)
             if rank == 0:
                 step_time += step_time_temp
-                diff_max_real.append(np.max(np.real(rho_t_series[i] - rho_t)))
-                diff_max_imag.append(np.max(np.imag(rho_t_series[i] - rho_t)))
-                diff_min_real.append(np.min(np.real(rho_t_series[i] - rho_t)))
-                diff_min_imag.append(np.min(np.imag(rho_t_series[i] - rho_t)))
+                diff_max_real.append(np.max(np.abs(np.real(rho_t_series[i] - rho_t))))
+                diff_max_imag.append(np.max(np.abs(np.imag(rho_t_series[i] - rho_t))))
 
         sim_time = time() - sim_time
         sim_time = comm.allreduce(sim_time, MPI.MAX)
@@ -60,8 +59,6 @@ def benchmark(omega, t1, t2, steps, files, files_sym, results, max_sim_time):
 
             np.save('QSW_MPI_Results/diff_max_real_' + basename(f[:-4]),diff_max_real)
             np.save('QSW_MPI_Results/diff_max_imag_' + basename(f[:-4]),diff_max_imag)
-            np.save('QSW_MPI_Results/diff_min_real_' + basename(f[:-4]),diff_min_real)
-            np.save('QSW_MPI_Results/diff_min_imag_' + basename(f[:-4]),diff_min_imag)
 
             log = open(logname, 'a')
             log.write('{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}\n'.format(
@@ -84,18 +81,18 @@ def benchmark(omega, t1, t2, steps, files, files_sym, results, max_sim_time):
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
+omega = 0.1
+t1 = 0.0
+t2 = 100.0
+steps = 1000
+max_sim_time = np.float(sys.argv[1])
+
 logname = 'QSW_MPI_Results/QSW_MPI_local_series_line.csv'
 if rank == 0:
     if not exists(logname):
         log = open(logname, 'a')
         log.write('name,comm_size,dim,nnz,SO_nnz,SO_time,rec_time,one_norms_time,series_time,step_time,total_time\n')
         log.close()
-
-omega = 0.1
-t1 = 0.0
-t2 = 100.0
-steps = 1000
-max_sim_time = np.float(sys.argv[1])
 
 files = natsorted(glob("../graphs/line_graphs/*.mtx"))
 files_sym = natsorted(glob("../graphs/line_graphs/sym/*.mtx"))

@@ -99,7 +99,7 @@ class walk(object):
 
     def _reconcile_mpi_communications(self):
         """
-        Analyses the structure of :math:`\\tilde{\mathcal{L}}` to optimise MPI communication of :math:`\\tilde{\\rho}(t)` during sparse-matrix multiplication. 
+        Analyses the structure of :math:`\\tilde{\mathcal{L}}` to optimise MPI communication of :math:`\\tilde{\\rho}(t)` during sparse-matrix multiplication.
         """
         self.rec_time = time()
 
@@ -168,15 +168,38 @@ class walk(object):
             * :math:`\\rho(t_0)` as a complex NumPy array.
 
             * :math:`p(t_0)`. An array describing the diagonal of :math:`\\rho(t_0)` which is then assumed to have no initial inter-vertex coherences.
+
+            * 'mixed' - Equally distribute :math:`\\rho(t_0)` over all sites, including specified sources and sinks.
         """
-        if not isinstance(state, np.ndarray):
-            state = np.array(state, dtype = np.complex128)
 
-        if len(state.shape) == 2:
-            self.rho = state
+        if not self.rho_set:
 
-        elif len(state.shape) == 1:
-            self.rho = np.diag(state)
+            if isinstance(state, str):
+
+                if str(state) == 'mixed':
+                    self.rho = np.full((self.size[0]), np.float64(1)/np.float64(self.size[0]), dtype = np.complex128)
+                    self.rho = np.diag(self.rho)
+                    self.rho_set = True
+
+                if not self.rho_set:
+                    raise ValueError('Initial state name "' + state + '" not reconised by walk class.')
+
+            else:
+
+                if not isinstance(state, np.ndarray):
+                    state = np.array(state, dtype = np.complex128)
+
+                if len(state.shape) == 2:
+                    self.rho = state
+                    self.rho_set = True
+
+                elif len(state.shape) == 1:
+                    self.rho = np.diag(state)
+                    self.rho_set = True
+
+                if not self.rho_set:
+                    raise ValueError('Unable to construct initial state from input array.')
+
 
         self.rho_v = fMPI.initial_state(
                 self.SO_local_rows,
@@ -646,7 +669,7 @@ class LQSW(walk):
 
     def initial_state(self, state):
         """
-        Sets the initial state, :math:`\\rho(t_0)`. For an :class:`~qsw_mpi.MPI.LQSW`, this method accepts additional keyword arguments.
+        Sets the initial state, :math:`\\rho(t_0)`. For an :class:`~qsw_mpi.MPI.LQSW`, this method accepts an additional keyword argument.
 
         :param state: One of the following:
 
@@ -659,14 +682,13 @@ class LQSW(walk):
             * 'mixed' - Equally distribute :math:`\\rho(t_0)` over all sites, including specified sources and sinks.
         """
 
+        self.rho_set = False
+
         if str(state) == 'sources':
             self.rho = np.zeros((self.size[0]), dtype = np.complex128)
             self.rho[-(self.n_sinks + self.n_sources):-self.n_sinks] = np.float64(1)/np.float64(self.n_sources)
             self.rho = np.diag(self.rho)
-
-        elif str(state) == 'mixed':
-            self.rho = np.full((self.size[0]), np.float64(1)/np.float64(self.size[0]), dtype = np.complex128)
-            self.rho = np.diag(self.rho)
+            self.rho_set = True
 
         else:
 
@@ -676,16 +698,16 @@ class LQSW(walk):
             if len(state.shape) == 2:
                 self.rho = np.concatenate((state, np.zeros((state.shape[0], self.pad))), axis = 1)
                 self.rho = np.concatenate((self.rho, np.zeros((self.pad, self.rho.shape[1]))), axis = 0)
+                self.rho_set = True
 
             elif len(state.shape) == 1:
                 self.rho = np.diag(np.concatenate((state, np.zeros((self.pad,))), axis = 0))
+                self.rho_set = True
 
-        self.rho_v = fMPI.initial_state(
-                self.SO_local_rows,
-                self.rho,
-                self.rank,
-                self.partition_table,
-                self.MPI_communicator.py2f())
+            if not self.rho_set:
+                raise ValueError('Unable to construct initial state from input array.')
+
+        super().initial_state(state)
 
 class GKSL(walk):
     """
@@ -784,8 +806,26 @@ class GKSL(walk):
 
         self.construct_time = time() - self.construct_time
 
-        def set_omega(self, omega):
-            warnings.warn("set_omega() not supported by GKSL class, superoperator unchanged.")
+    def set_omega(self, omega):
+        warnings.warn("set_omega() not supported by GKSL class, superoperator unchanged.")
+
+    def initial_state(self, state):
+
+        """
+        Sets the initial state :math:`\\rho(t_0)` and generates :math:`\\tilde{\\rho}(t_0)`.
+
+        :param state: One of the following:
+
+            * :math:`\\rho(t_0)` as a complex NumPy array.
+
+            * :math:`p(t_0)`. An array describing the diagonal of :math:`\\rho(t_0)` which is then assumed to have no initial inter-vertex coherences.
+
+            * 'mixed' - Equally distribute :math:`\\rho(t_0)` over all sites, including specified sources and sinks.
+        """
+
+        self.rho_set = False
+
+        super().initial_state()
 
 class GQSW(walk):
     """
@@ -911,6 +951,24 @@ class GQSW(walk):
 
         self.construct_time = time() - self.construct_time
 
+    def initial_state(self, state):
+
+        """
+        Sets the initial state :math:`\\rho(t_0)` and generates :math:`\\tilde{\\rho}(t_0)`.
+
+        :param state: One of the following:
+
+            * :math:`\\rho(t_0)` as a complex NumPy array.
+
+            * :math:`p(t_0)`. An array describing the diagonal of :math:`\\rho(t_0)` which is then assumed to have no initial inter-vertex coherences.
+
+            * 'mixed' - Equally distribute :math:`\\rho(t_0)` over all sites, including specified sources and sinks.
+        """
+
+        self.rho_set = False
+
+        super().initial_state(state)
+
     def gather_populations(self, root = 0):
         """
         Return :math:`p(t)` or :math:`(p(t_0),...,p(t_q))` following a call to :meth:`~qsw_mpi.MPI.walk.step` or :meth:`~qsw_mpi.MPI.walk.series`. In the case of a G-QSW, :math:`p(t)` corresponds to the originating graph :math:`G` (see Equation :eq:`eq:nm_gqsw`).
@@ -932,7 +990,7 @@ class GQSW(walk):
 
     def save_vsets(self, filename, vsetsname, action = 'a'):
         """
-        Save :math:`V^D` (see Equation :eq:`eq:nm_gqsw`) created by :meth:`~qsw_mpi.operators.nm_vsets` to a HDF5 file. 
+        Save :math:`V^D` (see Equation :eq:`eq:nm_gqsw`) created by :meth:`~qsw_mpi.operators.nm_vsets` to a HDF5 file.
 
         :param filename: File basename.
         :type filename: string

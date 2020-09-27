@@ -6,7 +6,7 @@ from matplotlib import use
 
 use("Agg")
 
-plt.rcParams.update({'font.size': 20})
+plt.rcParams.update({'font.size': 14})
 plt.rcParams.update({'text.usetex': True})
 plt.rcParams.update({'figure.autolayout': True})
 
@@ -45,39 +45,36 @@ def compare(df_m, df_mpi, graph_name):
                 rho_m = np.array(df_m[m]).view(np.complex128)
                 rho_mpi = np.array(df_mpi[str(i) + '/' + mpi]).view(np.complex128)
 
-                m_mean_cmplx.append(np.mean(np.imag(rho_mpi - rho_m)))
-                m_max_cmplx.append(np.max(np.imag(rho_mpi - rho_m)))
-                m_min_cmplx.append(np.min(np.imag(rho_mpi - rho_m)))
-                m_mean_real.append(np.mean(np.real(rho_mpi - rho_m)))
-                m_max_real.append(np.max(np.real(rho_mpi - rho_m)))
-                m_min_real.append(np.min(np.real(rho_mpi - rho_m)))
+                m_max_cmplx.append(np.abs(np.max(np.imag(rho_mpi - rho_m))))
+                m_max_real.append(np.abs(np.max(np.real(rho_mpi - rho_m))))
+
             except:
                 break
 
         validation_data[str(i)] = {
-            'm_mean_cmplx':m_mean_cmplx,
             'm_max_cmplx':m_max_cmplx,
-            'm_min_cmplx':m_min_cmplx,
-            'm_mean_real':m_mean_real,
             'm_max_real':m_max_real,
-            'm_min_real':m_min_real
         }
 
     return validation_data
 
-def dif_plot(valdat, prefix, color, comm_size, comp, plot_name):
-    xs = [i**2 for i in range(1,len(valdat[comm_size][prefix + '_mean_' + comp]) + 1)]
-    plt.figure(figsize = (5,5))
-    plt.plot(xs, valdat[comm_size][prefix + '_mean_' + comp], '1', color = color)
-    plt.plot(xs, valdat[comm_size][prefix + '_max_' + comp], '.', color = color)
-    plt.plot(xs, valdat[comm_size][prefix + '_min_' + comp], '.', color = color)
-    plt.xlabel("Verticies")
-    plt.ylabel(r"min$(\Delta\rho(t))$    \hspace{1.8cm}   max($\Delta\rho(t)$)")
-    plt.yscale('symlog', linthreshy = 1e-16)
-    plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
-    plt.ylim(-1e-9,1e-9)
+def dif_plot(valdat, prefix, comm_size, plot_name):
+    xs = [i**2 for i in range(1,len(valdat[comm_size][prefix + '_max_real']) + 1)]
+    plt.figure(figsize = (3.8,2.8))
+    plt.plot(xs, valdat[comm_size][prefix + '_max_real'], 'x', color = 'green', label = 'real', markersize=8)
+    plt.plot(xs, valdat[comm_size][prefix + '_max_cmplx'], '+', color = 'blue', label = 'complex' , markersize = 10)
+    plt.xlabel("verticies")
+    plt.ylabel(r"max$(|\Delta\rho(t)|)$")
+    plt.yscale('log')
+    plt.ylim(None,10e-9)
+    x_max = np.max(xs)
+    plt.xlim(0,x_max)
+    plt.xticks([0,int(x_max/2), x_max])
+    plt.yticks([10e-16,10e-14,10e-12,10e-10])
     plt.hlines(0, 1, max(xs) + 1,linestyles= '--', color = 'grey')
-    plt.savefig(plot_name, dpi = 300)
+    plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
+    plt.legend()
+    plt.savefig(plot_name, dpi = 300, bbox_inches = 'tight', edgecolour='none', pad_inches = 0.05)
     plt.close()
 
 linedat = compare(df_m_line, df_mpi_line, 'line')
@@ -86,17 +83,15 @@ randomdat = compare(df_m_random, df_mpi_random, 'random')
 completedat = compare(df_m_complete, df_mpi_complete, 'complete')
 
 for key in linedat.keys():
-    dif_plot(linedat, 'm', 'green', key, 'real', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_line_real_dif.jpg')
-    dif_plot(linedat, 'm', 'blue', key, 'cmplx', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_line_imag_dif.jpg')
+    dif_plot(linedat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_line_dif.jpg')
+    dif_plot(linedat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_line_dif.jpg')
 
-    dif_plot(griddat, 'm', 'green', key, 'real', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_grid_real_dif.jpg')
-    dif_plot(griddat, 'm', 'blue', key, 'cmplx', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_grid_imag_dif.jpg')
+    dif_plot(griddat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_grid_dif.jpg')
+    dif_plot(griddat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_grid_dif.jpg')
 
-    dif_plot(randomdat, 'm', 'green', key, 'real', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_random_real_dif.jpg')
-    dif_plot(randomdat, 'm', 'blue', key, 'cmplx', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_random_imag_dif.jpg')
+    dif_plot(randomdat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_random_dif.jpg')
+    dif_plot(randomdat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_random_dif.jpg')
 
-    dif_plot(completedat, 'm', 'green', key, 'real', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_line_complete_dif.jpg')
-    dif_plot(completedat, 'm', 'blue', key, 'cmplx', 'Plots/' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_line_complete_dif.jpg')
-
-
+    dif_plot(completedat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_complete_dif.jpg')
+    dif_plot(completedat, 'm', key, 'Plots/global_' + key + '_processes_' + 'QSW_MPI_vs_QSWalk_m_complete_dif.jpg')
 

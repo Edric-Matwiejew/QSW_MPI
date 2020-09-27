@@ -9,8 +9,6 @@ import matplotlib
 
 # Matplotlib parameters.
 matplotlib.use("Agg")
-plt.rcParams.update({'font.size': 20})
-plt.rcParams.update({'figure.autolayout': True})
 
 comm = MPI.COMM_WORLD
 
@@ -45,7 +43,7 @@ if comm.Get_rank() == 0:
     plt.figure(figsize=(4,4))
     plt.axis('off')
     plt.imshow(np.log(np.abs(rho_t)), cmap = 'Purples')
-    plt.savefig('2_tree_state',dpi=300)
+    plt.savefig('2_tree_state',dpi=300, bbox_inches='tight', pad_inches = 0.05)
     plt.close()
 
     pos = graphviz_layout(Graph, prog="twopi")
@@ -53,13 +51,17 @@ if comm.Get_rank() == 0:
     plt.axis('off')
     nx.draw(Graph,pos=pos,node_color='purple')
     plt.tight_layout()
-    plt.savefig('2_tree_graph',dpi=300)
+    plt.savefig(
+            '2_tree_graph',
+            dpi=300,
+            bbox_inches='tight',
+            pad_inches = 0.05)
     plt.close()
 
 """
 Steady state on an L-QSW on a cycle graph of 60 verticies.
 """
-N = 60
+N = 63
 Graph = nx.cycle_graph(N)
 
 G = nx.to_scipy_sparse_matrix(Graph)
@@ -82,7 +84,7 @@ if comm.Get_rank() == 0:
     pos = graphviz_layout(Graph)
     nx.draw(Graph,pos=pos,node_color='green',node_size=100)
     plt.tight_layout()
-    plt.savefig('2_cycle_graph',dpi=300)
+    plt.savefig('2_cycle_graph',dpi=300, bbox_inches='tight', pad_inches = 0.05)
     plt.close()
 
     plt.figure(figsize=(4,4))
@@ -95,5 +97,9 @@ if comm.Get_rank() == 0:
                 where=(np.abs(rho_t)!=0)))
 
     plt.imshow(rhot_plot, cmap = colmap,vmin=0.0001)
-    plt.savefig('2_cycle_state',dpi=300)
+    plt.savefig(
+            '2_cycle_state',
+            dpi=300,
+            bbox_inches='tight',
+            pad_inches = 0.05)
     plt.close()
