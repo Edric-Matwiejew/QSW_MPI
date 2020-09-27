@@ -31,6 +31,7 @@ def plot_times(graph_type, savename):
     plt.ylabel('time (s)')
     plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
     plt.ticklabel_format(axis='y', style='sci', scilimits = (0,0))
+    plt.legend()
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.clf()
 
@@ -53,6 +54,7 @@ def exp_times(graph_type, savename):
     plt.ylabel('time (s)')
     plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
     plt.ticklabel_format(axis='y', style='sci', scilimits = (0,0))
+    plt.legend()
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.close()
 
@@ -75,6 +77,7 @@ def construct_times(graph_type, savename):
     plt.ylabel('time (s)')
     plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
     plt.ticklabel_format(axis='y', style='sci', scilimits = (0,0))
+    plt.legend()
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.close()
 
@@ -103,6 +106,7 @@ def exp_plus_norm_times(graph_type, savename):
     plt.ylabel('time (s)')
     plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
     plt.ticklabel_format(axis='y', style='sci', scilimits = (0,0))
+    plt.legend()
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.close()
 

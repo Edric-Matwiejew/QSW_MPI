@@ -23,8 +23,8 @@ for i, (re_diff, im_diff) in enumerate(zip(diffs_max_real,diffs_max_imag)):
     reals = np.load(re_diff, allow_pickle=True)
     imags = np.load(im_diff, allow_pickle=True)
 
-    plt.plot(reals,'.', color = colors[i].rgb, alpha = 0.5, markeredgewidth = 0.0)
-    plt.plot(imags,'.', color = colors[i].rgb, alpha = 0.5, markeredgewidth = 0.0)
+    plt.plot(reals,'.', color = colors[i].rgb, alpha = 0.5, markeredgewidth = 0.0, legend = 'Re')
+    plt.plot(imags,'.', color = colors[i].rgb, alpha = 0.5, markeredgewidth = 0.0, legend = 'Im')
 
 
 plt.ylabel(r"max$(|\Delta \rho(t)|)$")
@@ -32,6 +32,7 @@ plt.xlabel(r"time steps")
 plt.yscale('log')
 plt.ylim(1e-17,1e-13)
 plt.yticks([10e-17,10e-16,10e-15,10e-14,10e-13])
+plt.legend()
 plt.savefig("plots/series_delta_line.jpg", dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
 plt.clf()
 
@@ -49,5 +50,6 @@ plt.ylabel(r"time (s)")
 plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
 plt.ticklabel_format(axis='y', style='sci', scilimits = (0,0))
 plt.xlabel(r"$\tilde{\mathcal{L}}$ Non-zeros")
+plt.legend()
 plt.savefig("plots/step_vs_series_times_line.jpg", dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
 plt.close()
