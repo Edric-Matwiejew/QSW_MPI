@@ -182,7 +182,7 @@ class walk(object):
                     self.rho_set = True
 
                 if not self.rho_set:
-                    raise ValueError('Initial state name "' + state + '" not reconised by walk class.')
+                    raise ValueError('Initial state name "' + state + '" not recognised by walk class.')
 
             else:
 
