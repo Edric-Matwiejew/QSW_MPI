@@ -2,6 +2,28 @@
 Changelog
 =========
 
+****************************************************
+1.0.1 - 2020-09-25 Bug Fix and Minor Feature Release
+****************************************************
+
+Added
+-----
+
+* All :class:`~qsw_mpi.MPI.walk` sub-classes will now initialise :math:`\rho(0)` as a maximally mixed state on passing `'mixed'` to :meth:`~qsw_mpi.MPI.walk.initial_state`.
+
+Fixed
+-----
+
+* Fixed incorrect superoperator generation when using the :class:`~qsw_mpi.MPI.GQSW` class which occured when a global Lindblad operator had an empty row aligning with the first row of the local partition of the :math:`L^TL^* \otimes I_N` term in :math:`\tilde{\mathcal{L}}`.
+* Edited the 'Theory' and 'Package Overview' sections of the package documentation to be in line with reviewer comments on the corresponding journal article.
+
+Changed
+-------
+
+* Changed plot sizes and plot text sizes in response to reviewer feedback.
+* Enabled plot legends in desktop benchmarks output.
+* Desktop accuracy benchmarks now consider only :math:`\mathrm{max}(|\Delta\rho(t)|)`.
+
 **********************************
 1.0.0 - 2020-07-01 Feature Release
 **********************************
