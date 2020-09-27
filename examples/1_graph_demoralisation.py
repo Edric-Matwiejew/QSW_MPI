@@ -13,7 +13,7 @@ import matplotlib
 
 # Matplotlib parameters.
 matplotlib.use("Agg")
-plt.rcParams.update({'font.size': 18})
+plt.rcParams.update({'font.size': 16})
 plt.rcParams.update({'figure.autolayout': True})
 """
 As this system is small, only 1 MPI node will be used.
@@ -110,7 +110,7 @@ and passed to the walk object. System propagation and
 moralisation proceeds as before.
 """
 rho_0_nm = qsw_mpi.operators.nm_rho_map(rho_0, vsets)
-nm_GQSW.initial_state(rho_0_nm)
+nm_GQSW.initial_state(rho_0)
 nm_GQSW.step(t=100)
 rhot_nm = nm_GQSW.gather_result()
 
@@ -198,7 +198,7 @@ if comm.Get_rank() == 0:
     higher transfer of probability to the sink vertex and does not as
     readily decay to a quasi-stationary state.
     """
-    plt.figure(figsize=(5,4.7))
+    plt.figure(figsize=(3.8,3.4))
     plt.xlabel('t', fontsize = 20)
     plt.ylabel(r'$p_{v_3}(t)$', fontsize = 20)
     plt.xticks(ticks=[0,250,500],labels=[0,12.5,25])

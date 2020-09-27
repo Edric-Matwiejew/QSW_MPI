@@ -6,7 +6,7 @@ from matplotlib import use
 
 use("Agg")
 
-plt.rcParams.update({'font.size': 14})
+plt.rcParams.update({'font.size': 16})
 plt.rcParams.update({'text.usetex': True})
 plt.rcParams.update({'figure.autolayout': True})
 
@@ -57,19 +57,18 @@ def compare(df_m, df_mpi, graph_name):
 def dif_plot(valdat, prefix, comm_size, plot_name):
     xs = [i**2 for i in range(1,len(valdat[comm_size][prefix + '_max_real']) + 1)]
     plt.figure(figsize = (3.8,2.8))
-    plt.plot(xs, valdat[comm_size][prefix + '_max_real'], 'x', label = 'real',color = 'green', markersize=8)
-    plt.plot(xs, valdat[comm_size][prefix + '_max_cmplx'], '+', label = 'complex', color = 'blue', markersize = 10)
+    plt.plot(xs, valdat[comm_size][prefix + '_max_real'], 'x', color = 'green', markersize=8)
+    plt.plot(xs, valdat[comm_size][prefix + '_max_cmplx'], '+', color = 'blue', markersize = 10)
     plt.xlabel("verticies")
     plt.ylabel(r"max$(|\Delta\rho(t)|)$")
     plt.yscale('log')
     plt.ylim(None,10e-9)
     x_max = np.max(xs)
-    plt.xlim(0,x_max)
-    plt.xticks([0,int(x_max/2), x_max])
+    plt.xlim(None,x_max)
+    plt.xticks(np.array([0,round((x_max/2)/10**np.floor(np.log10(x_max/2)),1)*10**np.floor(np.log10(x_max/2)), round(x_max/10**np.floor(np.log10(x_max)),1)*10**np.floor(np.log10(x_max))]))
     plt.yticks([10e-16,10e-14,10e-12,10e-10])
     plt.hlines(0, 1, max(xs) + 1,linestyles= '--', color = 'grey')
     plt.ticklabel_format(axis='x', style='sci', scilimits = (0,0))
-    plt.legend()
     plt.savefig(plot_name, dpi = 300, bbox_inches = 'tight', edgecolour='none', pad_inches = 0.05)
     plt.close()
 

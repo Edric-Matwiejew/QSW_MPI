@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 comm = MPI.COMM_WORLD
 
 """
-Steady state of an L-QSW on a 2-branching tree graph of depth 5:
+Steady state of an L-QSW on a full binary tree of depth 5:
 """
 Graph = nx.balanced_tree(2,5)
 G = nx.to_scipy_sparse_matrix(Graph)
@@ -43,7 +43,7 @@ if comm.Get_rank() == 0:
     plt.figure(figsize=(4,4))
     plt.axis('off')
     plt.imshow(np.log(np.abs(rho_t)), cmap = 'Purples')
-    plt.savefig('2_tree_state',dpi=300, bbox_inches='tight', pad_inches = 0.05)
+    plt.savefig('2_full_binary_tree_state',dpi=300, bbox_inches='tight', pad_inches = 0.05)
     plt.close()
 
     pos = graphviz_layout(Graph, prog="twopi")
@@ -52,7 +52,7 @@ if comm.Get_rank() == 0:
     nx.draw(Graph,pos=pos,node_color='purple')
     plt.tight_layout()
     plt.savefig(
-            '2_tree_graph',
+            '2_full_binary_tree_graph',
             dpi=300,
             bbox_inches='tight',
             pad_inches = 0.05)
