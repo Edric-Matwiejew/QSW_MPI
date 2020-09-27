@@ -9,9 +9,9 @@ plt.rcParams.update({'font.size': 16})
 plt.rcParams.update({'text.usetex': True})
 plt.rcParams.update({'figure.autolayout': True})
 
-df_jl = pd.read_csv("Results/QSWalk_jl_local_step.csv")
-df_m = pd.read_csv("Results/QSWalk_m_local_step.csv")
-df_MPI = pd.read_csv("Results/QSW_MPI_local_step.csv")
+df_jl = pd.read_csv("Results/QSWalk_jl_global_step.csv")
+df_m = pd.read_csv("Results/QSWalk_m_global_step.csv")
+df_MPI = pd.read_csv("Results/QSW_MPI_global_step.csv")
 
 df_MPI_1 = df_MPI[df_MPI["comm_size"] == 1]
 max_comm = np.max(df_MPI["comm_size"].values)
@@ -35,10 +35,10 @@ def plot_times(graph_type, savename):
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.clf()
 
-plot_times('line', 'Plots/local_line_total_times')
-plot_times('grid', 'Plots/local_grid_total_times')
-plot_times('random', 'Plots/local_random_total_times')
-plot_times('complete', 'Plots/local_complete_total_times')
+plot_times('line', 'Plots/global_line_total_times')
+plot_times('grid', 'Plots/global_grid_total_times')
+plot_times('random', 'Plots/global_random_total_times')
+plot_times('complete', 'Plots/global_complete_total_times')
 
 def exp_times(graph_type, savename):
     plt.figure(figsize=(3.8,3.4))
@@ -58,10 +58,10 @@ def exp_times(graph_type, savename):
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.close()
 
-exp_times('line', 'Plots/local_line_exp_times')
-exp_times('grid', 'Plots/local_grid_exp_times')
-exp_times('random', 'Plots/local_random_exp_times')
-exp_times('complete', 'Plots/local_complete_exp_times')
+exp_times('line', 'Plots/global_line_exp_times')
+exp_times('grid', 'Plots/global_grid_exp_times')
+exp_times('random', 'Plots/global_random_exp_times')
+exp_times('complete', 'Plots/global_complete_exp_times')
 
 def construct_times(graph_type, savename):
     plt.figure(figsize=(3.8,3.4))
@@ -81,10 +81,10 @@ def construct_times(graph_type, savename):
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.close()
 
-construct_times('line', 'Plots/local_line_construct_times')
-construct_times('grid', 'Plots/local_grid_construct_times')
-construct_times('random', 'Plots/local_random_construct_times')
-construct_times('complete', 'Plots/local_complete_construct_times')
+construct_times('line', 'Plots/global_line_construct_times')
+construct_times('grid', 'Plots/global_grid_construct_times')
+construct_times('random', 'Plots/global_random_construct_times')
+construct_times('complete', 'Plots/global_complete_construct_times')
 
 def exp_plus_norm_times(graph_type, savename):
     plt.figure(figsize=(3.8,3.4))
@@ -110,7 +110,7 @@ def exp_plus_norm_times(graph_type, savename):
     plt.savefig(savename, dpi = 300, bbox_inches = 'tight', pad_inches = 0.05)
     plt.close()
 
-exp_plus_norm_times('line', 'Plots/local_line_exp_plus_norm_times.jpg')
-exp_plus_norm_times('grid', 'Plots/local_grid_exp_plus_norm_times.jpg')
-exp_plus_norm_times('random', 'Plots/local_random_exp_plus_norm_times.jpg')
-exp_plus_norm_times('complete', 'Plots/local_complete_exp_plus_norm_times.jpg')
+exp_plus_norm_times('line', 'Plots/global_line_exp_plus_norm_times.jpg')
+exp_plus_norm_times('grid', 'Plots/global_grid_exp_plus_norm_times.jpg')
+exp_plus_norm_times('random', 'Plots/global_random_exp_plus_norm_times.jpg')
+exp_plus_norm_times('complete', 'Plots/global_complete_exp_plus_norm_times.jpg')
