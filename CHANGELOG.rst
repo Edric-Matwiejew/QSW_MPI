@@ -2,6 +2,16 @@
 Changelog
 =========
 
+**************************
+1.0.2 - 2020-09-27 Bug Fix
+**************************
+
+Fixed
+-----
+
+* Fixed bug in :class:`~qsw_mpi.MPI.LQSW.initial_state` whereby argument 'mixed' was not correctly passed to :class:`~qsw_mpi.MPI.walk.initial_state`.
+
+
 ****************************************************
 1.0.1 - 2020-09-25 Bug Fix and Minor Feature Release
 ****************************************************
