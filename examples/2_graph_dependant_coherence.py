@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from networkx.drawing.nx_pydot import graphviz_layout
 import matplotlib
+import copy
 
 # Matplotlib parameters.
 matplotlib.use("Agg")
@@ -89,7 +90,7 @@ if comm.Get_rank() == 0:
 
     plt.figure(figsize=(4,4))
     plt.axis('off')
-    colmap = matplotlib.cm.Greens
+    colmap = copy.copy(matplotlib.cm.Greens)
     colmap.set_under('white')
 
     rhot_plot = np.abs(np.log(np.abs(rho_t),
