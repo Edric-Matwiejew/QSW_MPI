@@ -7,4 +7,8 @@ This folder contains examples of QSW_MPI workflows. For a detailed discussion, s
 Addtional Dependencies
 ----------------------
 
-* NetworkX
+* NetworkX (python).
+* Matplotlib (python).
+* pydot (python).
+* Graphviz (non-python, required by pydot).
+
