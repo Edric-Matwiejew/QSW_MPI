@@ -428,7 +428,7 @@ Graph Demoralisation
 
    for each :math:`v_i \in V`. Associated with :math:`V^D` is edge set
    :math:`E^{uD} = \{(v^i_j,v^k_l), (v^m_n,v^o_p),...\}`, where
-   :math:`\{v^l_i,v^k_j\} \in E^{uD} \iff (v_i,v_k) \in E^u`. These have
+   :math:`(v^l_i,v^k_j) \in E^{uD} \iff (v_i,v_k) \in E^u`. These have
    weights,
 
    .. math::
@@ -443,7 +443,7 @@ Graph Demoralisation
 
 #. Construct the demoralised digraph,
    :math:`\mathcal{G}^D = (V^D,E^D,\text{w}^D)` where
-   :math:`\{v_i^j,v_k^l\} \in E^D \iff (v_i,v_k) \in E`. Arc weights,
+   :math:`(v_i^j,v_k^l) \in E^D \iff (v_i,v_k) \in E`. Arc weights,
    :math:`\text{w}^D(V^D_i,V^D_k)`, are given by Equation
    :eq:`eq:nm_weight` with :math:`\text{w}(v_i,v_k)`
    in place of :math:`\text{w}^u(v_i,v_k)` and :math:`E^D` in place of
@@ -456,7 +456,7 @@ Graph Demoralisation
    .. math::
       :label: eq:dm_lind
 
-          L^D = (F_i)_{l,(k+1)}\text{G}^{D}_{v_i^l,v_k^j}\lvert v^j_i \rangle \langle v^l_k \rvert,
+          L^D = [F_i]_{j+1,k}\text{G}^{D}_{v_i^j,v_k^l}\lvert v^j_i \rangle \langle v^l_k \rvert,
 
    and QSW_MPI follows the convention of choosing for :math:`\{F_i\}`
    the Fourier matrices\ :sup:`6`.
@@ -468,8 +468,8 @@ Graph Demoralisation
 
           \langle v^k_l \rvert H^D_{\text{rot}} \lvert v^i_j \rangle =
           \begin{cases}
-            \text{i}, & l=j \text{ and } i = k + 1 \mod \text{Deg}(v_i) \\
-            -\text{i}, & l=j \text{ and } i = k - 1 \mod \text{Deg}(v_i) \\
+            \text{i}, & l=j \text{ and } i = k + 1 \\
+            -\text{i}, & l=j \text{ and } i = k - 1 \\
             0, & \text{otherwise}
           \end{cases}
 
