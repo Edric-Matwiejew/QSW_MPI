@@ -20,7 +20,7 @@ from scipy.special import factorial
 import qsw_mpi.foperators as foperators
 import copy
 
-I = np.complex(0,1)
+I = 1j
 
 def check_indices(G):
     """
