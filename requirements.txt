@@ -1,3 +1,7 @@
+""" run 
+sudo apt install make openmpi-bin openmpi-common openmpi-doc libopenmpi-dev mpich -y
+"""
+
 numpy
 scipy
 mpi4py
