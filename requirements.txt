@@ -1,5 +1,5 @@
 """ run 
-sudo apt install make openmpi-bin openmpi-common openmpi-doc libopenmpi-dev mpich -y
+sudo apt install make openmpi-bin gfortran openmpi-common openmpi-doc libopenmpi-dev mpich -y
 """
 wheel
 numpy
