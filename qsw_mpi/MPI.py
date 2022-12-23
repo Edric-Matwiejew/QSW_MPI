@@ -883,8 +883,8 @@ class GQSW(walk):
             self.H_loc_indices = H_loc.indices
             self.H_loc_data = H_loc.data
         else:
-            self.H_loc_indptr = np.zeros(H.shape[0] + 1, dtype = np.int)
-            self.H_loc_indices = np.zeros(1, dtype = np.int)
+            self.H_loc_indptr = np.zeros(H.shape[0] + 1, dtype = np.int64)
+            self.H_loc_indices = np.zeros(1, dtype = np.int64)
             self.H_loc_data = np.zeros(1, dtype = np.complex128)
 
         self.vsets = vsets
@@ -1015,9 +1015,9 @@ class GQSW(walk):
                 dset = f.create_dataset(
                         vsetsname + '/' + str(i),
                         (len(v),),
-                        dtype = np.int)
+                        dtype = np.int64)
 
-                dset[:] = np.array(v, dtype = np.int)
+                dset[:] = np.array(v, dtype = np.int64)
 
             f.close()
 

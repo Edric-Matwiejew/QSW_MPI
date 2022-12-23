@@ -16,6 +16,7 @@ __pycache__
 *.pyc
 *.npz
 *.mtx
+*.so
 junk
 build/*
 *egg-info

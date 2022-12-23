@@ -74,7 +74,7 @@ Enter the newly created 'QSW_MPI/dist' folder, which should contain the archive 
 
 .. code-block::
 
-    pip3 install qsw_mpi-0.0.1.tar.gz
+    pip3 install qsw_mpi-1.0.2.tar.gz
 
 Documentation
 -------------
