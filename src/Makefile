@@ -23,12 +23,30 @@ ifeq ($(OPENMP),TRUE)
 	FCFLAGS := $(FCFLAGS) -fopenmp
 endif
 
-EXT_SUFFIX := $(shell $(PYTHON_CALL)-config --extension-suffix)
+EXT_SUFFIX := $(shell $(PYTHON_CALL) -c 'import sysconfig; print(sysconfig.get_config_var("EXT_SUFFIX"))')
 
 OBJDIR := obj
 PYDIR := ../qsw_mpi
 
 $(shell mkdir -p $(OBJDIR))
+
+H5PFC ?= h5pfc
+ifeq ($(shell uname -s),Darwin)
+# Keep the parallel HDF5 symbols private when h5py loads its own HDF5 library.
+HDF5_ENV = HDF5_USE_SHLIB=no LDFLAGS="$(LDFLAGS) -Wl,-exported_symbol,_PyInit_fHDF5"
+endif
+
+.PHONY: all parallel_io
+all: $(PYDIR)/fMPI$(EXT_SUFFIX)
+ifneq ($(shell command -v $(H5PFC)),)
+all: parallel_io
+endif
+
+parallel_io: $(PYDIR)/fHDF5$(EXT_SUFFIX)
+
+$(PYDIR)/fHDF5$(EXT_SUFFIX): fHDF5.pyf parallel_io.f90
+	$(HDF5_ENV) $(PYTHON_CALL) -m numpy.f2py --f90exec="$(H5PFC)" --f77exec="$(H5PFC)" --f90flags="$(FCFLAGS)" -c fHDF5.pyf parallel_io.f90
+	mv fHDF5$(EXT_SUFFIX) $(PYDIR)
 
 $(OBJDIR)/%.o: %.f90
 	$(FC) $(FCFLAGS) -I$(OBJDIR) -J$(OBJDIR) -c $< -o $@ -fPIC

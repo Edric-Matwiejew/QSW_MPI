@@ -20,7 +20,7 @@ Requirements
 * GNU make
 * GNU Fortran 5 or higher
 * A functional MPI implementation
-* HDF5
+* Parallel HDF5 with the Fortran interface 
 * Python 3.6.9 or higher
 
 Python packages:
@@ -29,7 +29,7 @@ Python packages:
 * mpi4py
 * NumPy
 * SciPy
-* H5py
+* h5py 
 
 Additional python packages required to run the usage examples:
 

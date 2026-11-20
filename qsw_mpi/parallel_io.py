@@ -1,150 +1,201 @@
+import os
+from functools import lru_cache
+
 import h5py
 import numpy as np
+from mpi4py import MPI
 
-def __matricize_index(self, index, offset):
 
-    j = np.int64(np.ceil((1 + index + offset)/self.size[0])) - 1
-    i = np.int64(index + offset - j*self.size[0])
+# HDF5 1.x compatible representation of NumPy complex128.
+complex_dtype = np.dtype([('r', '<f8'), ('i', '<f8')])
 
-    return i, j
 
-def save_result(self, filename, walkname, action = 'a'):
+@lru_cache(maxsize=1)
+def _native_io():
+    try:
+        from qsw_mpi.fHDF5 import parallel_io
+    except ModuleNotFoundError as exc:
+        if exc.name != 'qsw_mpi.fHDF5':
+            raise
+        return None
+    return parallel_io
 
-    f = h5py.File(filename + '.h5', action, driver = 'mpio', comm = self.MPI_communicator)
 
-    if self.local_result.ndim == 1:
-
-        dset = f.create_dataset(
-                walkname,
-                (self.size[0], self.size[0]),
-                dtype = np.complex128)
-
-        it, jt = __matricize_index(
-                self,
-                0,
-                self.partition_table[self.rank] - 1)
-
-        kt = 0
-        if it != 0:
-            dset[it:self.size[0],jt] = self.local_result[0:self.size[0] - it]
-            jt += 1
-            kt = self.size[0] - it
-
-        ib, jb = __matricize_index(
-                self,
-                self.rho_v.shape[0] - 1,
-                self.partition_table[self.rank] - 1)
-
-        kb = self.local_result.shape[0]
-        if ib != self.size[0] - 1:
-            kb = kb - ib - 1
-            dset[0:ib + 1,jb] = self.local_result[kb:self.local_result.shape[0]]
-            jb -= 1
-
-        if jt <= jb:
-            dset[:,jt:jb + 1] = np.reshape(
-                    self.local_result[kt:kb],
-                    (self.size[0], jb - jt + 1), order = "F")
-
-        f.close()
-
+def _pack_blocks(blocks):
+    starts, arrays = zip(*blocks)
+    offsets = np.asarray(starts, dtype=np.int64).T
+    counts = np.asarray([a.shape for a in arrays], dtype=np.int64).T
+    nonempty = [a for a in arrays if a.size]
+    if not nonempty:
+        buffer = np.empty(1, dtype=np.int8)
+    elif len(nonempty) == 1:
+        buffer = np.ascontiguousarray(nonempty[0]).reshape(-1).view(np.int8)
     else:
+        values = np.empty(sum(a.size for a in nonempty), dtype=nonempty[0].dtype)
+        first = 0
+        for array in nonempty:
+            end = first + array.size
+            values[first:end].reshape(array.shape)[:] = array
+            first = end
+        buffer = values.view(np.int8)
+    return offsets, counts, buffer
 
-        dset = f.create_dataset(
-                walkname,
-                (self.local_result.shape[1], self.size[0], self.size[0]) ,
-                dtype = np.complex128)
 
-        it, jt = __matricize_index(
-                self,
-                0,
-                self.partition_table[self.rank] - 1)
+def _create_datasets(handle, datasets, dimensions):
+    for name in datasets:
+        if name in handle:
+            raise ValueError("Dataset already exists: " + name)
+    created = []
+    try:
+        for name, (shape, dtype, _) in datasets.items():
+            handle.create_dataset(name, shape=shape, dtype=dtype)
+            created.append(name)
+        if dimensions is not None:
+            group, shape = dimensions
+            handle[group].attrs['dimensions'] = shape
+    except Exception:
+        for name in created:
+            del handle[name]
+        raise
 
-        kt = 0
-        if it != 0:
-            dset[:,it:self.size[0],jt] = self.local_result[0:self.size[0] - it,:].T
-            jt += 1
-            kt = self.size[0] - it
 
-        ib, jb = __matricize_index(
-                self,
-                self.rho_v.shape[0] - 1,
-                self.partition_table[self.rank] - 1)
+def _write_partitions(lib, comm, filename, packed):
+    file_id = lib.open_file(os.fsencode(filename), comm.py2f())
+    if file_id < 0:
+        raise OSError("Could not open HDF5 file for collective output: " + filename)
+    try:
+        for name, (offsets, counts, buffer) in packed.items():
+            status = lib.write_dataset(file_id, name.encode('utf-8'), comm.py2f(),
+                                       offsets, counts, buffer)
+            if status < 0:
+                raise OSError("Could not write HDF5 dataset " + name + " in " + filename)
+    finally:
+        status = lib.close_file(file_id)
+        if comm.allreduce(status < 0, op=MPI.LOR):
+            raise OSError("Could not close HDF5 file: " + filename)
 
-        kb = self.local_result.shape[0]
-        if ib != self.size[0] - 1:
-            kb = kb - ib - 1
-            dset[:,0:ib + 1,jb] = self.local_result[kb:self.local_result.shape[0],:].T
-            jb -= 1
 
-        if jt <= jb:
-            dset[:,:,jt:jb + 1] = np.reshape(
-                    self.local_result[kt:kb,:].T,
-                    (self.local_result.shape[1],self.size[0],jb-jt+1),
-                    order="C")
+def _write(comm, filename, action, datasets, dimensions=None):
+    filename = filename + '.h5'
+    lib = _native_io()
+    if lib is None:
+        if not h5py.get_config().mpi:
+            raise RuntimeError("Build the parallel HDF5 writer with 'make parallel_io' in QSW_MPI/src")
+        with h5py.File(filename, action, driver='mpio', comm=comm) as handle:
+            _create_datasets(handle, datasets, dimensions)
+            for name, (_, _, blocks) in datasets.items():
+                for start, array in blocks:
+                    if array.size:
+                        region = tuple(slice(i, i + n) for i, n in zip(start, array.shape))
+                        handle[name][region] = array
+        return
 
-        f.close()
+    packed = {}
+    error = None
+    try:
+        for name, (shape, _, blocks) in datasets.items():
+            if 0 not in shape:
+                packed[name] = _pack_blocks(blocks)
+    except (MemoryError, ValueError, OverflowError) as exc:
+        error = exc
+    if comm.allreduce(error is not None, op=MPI.LOR):
+        raise next(exc for exc in comm.allgather(error) if exc is not None)
 
-def save_populations(self, filename, popname, action = 'a'):
+    # Close the serial metadata handle before opening the file collectively.
+    if comm.rank == 0:
+        try:
+            with h5py.File(filename, action) as handle:
+                _create_datasets(handle, datasets, dimensions)
+        except Exception as exc:
+            error = exc
+    error = comm.bcast(error)
+    if error is not None:
+        raise error
 
-    local_populations = self.get_local_populations()
+    try:
+        _write_partitions(lib, comm, filename, packed)
+    except OSError:
+        try:
+            if comm.rank == 0:
+                with h5py.File(filename, 'r+') as handle:
+                    for name in datasets:
+                        del handle[name]
+        finally:
+            comm.Barrier()
+        raise
 
-    f = h5py.File(filename + '.h5', action, driver = 'mpio', comm = self.MPI_communicator)
 
-    if self.local_result.ndim == 1:
+def save_result(self, filename, walkname, action='a'):
+    n = self.size[0]
+    local = self.local_result
+    col, row = divmod(int(self.partition_table[self.rank]) - 1, n)
+    leading = min(len(local), n - row) if row else 0
+    columns, trailing = divmod(len(local) - leading, n)
+    first_col = col + int(leading > 0)
+    times = local.shape[1:]
+    blocks = []
+    first = 0
+    # A vector partition can start and end partway through a matrix column.
+    for r, c, rows, cols in ((row, col, leading, 1), (0, first_col, n, columns),
+                             (0, first_col + columns, trailing, 1)):
+        end = first + rows * cols
+        array = local[first:end].reshape((cols, rows) + times).T
+        start = (0,) * len(times) + (r, c)
+        blocks.append((start, array))
+        first = end
 
-        save_counts = np.array(self.MPI_communicator.allgather(len(local_populations)), dtype = np.int64)
+    _write(self.MPI_communicator, filename, action,
+           {walkname: (times + (n, n), complex_dtype, blocks)})
 
-        bounds = np.zeros(self.flock + 1, dtype = np.int64)
-        bounds[0] = 0
-        bounds[1:self.flock + 1] = save_counts
 
-        for i in range(self.flock):
-            bounds[i + 1] = bounds[i + 1] + bounds[i]
+def _vertex_populations(self, first, local):
+    comm = self.MPI_communicator
+    n = len(self.vsets)
+    bounds = np.arange(comm.size + 1, dtype=np.int64) * n // comm.size
+    sites = np.concatenate(self.vsets).astype(np.intp)
+    vertices = np.repeat(np.arange(n), [len(v) for v in self.vsets])
+    owned = (sites >= first) & (sites < first + len(local))
+    sites = sites[owned] - first
+    vertices = vertices[owned]
 
-        dset = f.create_dataset(
-                popname,
-                (self.size[0],),
-                dtype = np.complex128)
+    # Sum split vertex subspaces on the ranks that will write them.
+    steps = local.shape[1] if local.ndim == 2 else 1
+    local = local.reshape((len(local), steps))
+    result = np.empty((bounds[comm.rank + 1] - bounds[comm.rank], steps),
+                      dtype=np.complex128, order='F')
+    partial = np.empty(n, dtype=np.complex128)
+    counts = np.diff(bounds)
+    for step in range(steps):
+        partial.fill(0)
+        np.add.at(partial, vertices, local[sites, step])
+        comm.Reduce_scatter(partial, result[:, step], recvcounts=counts, op=MPI.SUM)
+    return bounds[comm.rank], result.reshape((len(result),) + self.local_result.shape[1:])
 
-        dset[bounds[self.rank]:bounds[self.rank + 1]] = local_populations
 
-        f.close()
+def save_populations(self, filename, popname, action='a'):
+    n = self.size[0]
+    first = (int(self.partition_table[self.rank]) - 1 + n) // (n + 1)
+    local = self._get_local_populations()
+    if getattr(self, 'vsets', None) is not None:
+        first, local = _vertex_populations(self, first, local)
+        n = len(self.vsets)
+    shape = (n,) + local.shape[1:]
+    start = (first,) + (0,) * (local.ndim - 1)
+    _write(self.MPI_communicator, filename, action,
+           {popname: (shape, complex_dtype, [(start, local)])})
 
-    else:
 
-        save_counts = np.array(self.MPI_communicator.allgather(local_populations.shape[0]))
-
-        bounds = np.zeros(self.flock + 1, dtype = np.int64)
-        bounds[0] = 0
-        bounds[1:self.flock + 1] = save_counts
-
-        for i in range(self.flock):
-            bounds[i + 1] = bounds[i + 1] + bounds[i]
-
-        dset = f.create_dataset(
-                popname,
-                (self.size[0], local_populations.shape[1]),
-                dtype = np.complex128)
-
-        dset[bounds[self.rank]:bounds[self.rank + 1],::] = local_populations
-
-        f.close()
-
-def save_superoperator(self, filename, operatorname, action = 'a'):
-
+def save_superoperator(self, filename, operatorname, action='a'):
     comm = self.MPI_communicator
     start = int(self.SO_row_starts[0]) - 1
-    end = start + int(self.SO_nnz)
-    total = comm.bcast(end, root=self.flock - 1)
+    total = comm.bcast(start + int(self.SO_nnz), root=comm.size - 1)
     first_row = int(self.partition_table[self.rank]) - 1
-    row_count = int(self.SO_local_rows) + int(self.rank == self.flock - 1)
-
-    with h5py.File(filename + '.h5', action, driver='mpio', comm=comm) as f:
-        pointers = f.create_dataset(operatorname + '/indptr', (self.SO_rows + 1,), dtype=np.int64)
-        columns = f.create_dataset(operatorname + '/indices', (total,), dtype=self.SO_col_indexes.dtype)
-        values = f.create_dataset(operatorname + '/data', (total,), dtype=np.complex128)
-        pointers[first_row:first_row + row_count] = self.SO_row_starts[:row_count] - 1
-        columns[start:end] = self.SO_col_indexes - 1
-        values[start:end] = self.SO_values
-        f[operatorname].attrs['dimensions'] = (self.SO_rows, self.SO_rows)
+    count = int(self.SO_local_rows) + int(self.rank == comm.size - 1)
+    pointers = self.SO_row_starts[:count].astype(np.int64, copy=False) - 1
+    columns = self.SO_col_indexes - 1
+    datasets = {
+        operatorname + '/indptr': ((self.SO_rows + 1,), np.int64, [((first_row,), pointers)]),
+        operatorname + '/indices': ((total,), columns.dtype, [((start,), columns)]),
+        operatorname + '/data': ((total,), complex_dtype, [((start,), self.SO_values)])
+    }
+    _write(comm, filename, action, datasets, (operatorname, (self.SO_rows, self.SO_rows)))

@@ -3,9 +3,14 @@
 
 import os
 import io
-import subprocess
+import sysconfig
 
-from setuptools import find_packages, setup, Command
+from setuptools import Distribution, find_packages, setup
+
+
+class BinaryDistribution(Distribution):
+    def has_ext_modules(self):
+        return True
 
 # Package meta-data.
 NAME = 'qsw_mpi'
@@ -18,18 +23,14 @@ VERSION = '1.0.2'
 
 # What packages are required for this module to be exeuted?
 REQUIRED = [
-        'numpy', 'scipy', 'mpi4py']
+        'numpy', 'scipy', 'mpi4py', 'h5py']
 
 # What packages are optional?
 EXTRAS = {
-        '.qsw support':['h5py'],
         'visulisation':['matplotlib', 'networkx']
         }
 
-EXTENSION = subprocess.run(
-        ['python3-config --extension-suffix'],
-        shell = True,
-        stdout = subprocess.PIPE).stdout.decode('utf-8').strip()
+EXTENSION = sysconfig.get_config_var('EXT_SUFFIX')
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -47,6 +48,7 @@ setup(
         python_requires = REQUIRES_PYTHON,
         url = URL,
         packages = find_packages(exclude = ['examples/*']),
+        distclass = BinaryDistribution,
         package_data = {
             'qsw_mpi': ['*' + EXTENSION],
             },

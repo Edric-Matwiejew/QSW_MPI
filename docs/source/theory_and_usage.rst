@@ -578,13 +578,32 @@ method or for a number of equally spaced points using the :meth:`~qsw_mpi.MPI.wa
 method. These return :math:`\tilde{\rho}(t)` (or
 :math:`\tilde{\vec{\rho}}(t)`) as a distributed vectorized matrix(s)
 which can be reshaped and gathered to a specified MPI process via
-:meth:`~qsw_mpi.MPI.walk.gather_result`, or measured via :meth:`~qsw_mpi.MPI.walk.series.gather_populations`. Otherwise,
-results may be reshaped and saved directly to disk using :meth:`~qsw_mpi.MPI.walk.save_result`
-or :meth:`~qsw_mpi.MPI.walk.save_population`. File I/O is carried out using h5py\ :sup:`10`, a
-Python interface to the HDF5 libraries, and will default to MPI
-parallel-I/O methods contained in the non-user accessible
-`parallel_io`` module if such operations are supported by the
-host system. Finally, a second user accessible module
+:meth:`~qsw_mpi.MPI.walk.gather_result`, or measured via :meth:`~qsw_mpi.MPI.walk.gather_populations`.
+By default, :meth:`~qsw_mpi.MPI.walk.save_result`,
+:meth:`~qsw_mpi.MPI.walk.save_populations` and :meth:`~qsw_mpi.MPI.walk.save_superoperator`
+gather their data on rank zero for output. With the native parallel HDF5 writer
+installed, set ``walk.parallel_io = True`` on all participating ranks to write
+their partitions directly to a shared file.
+
+Both modes store complex values as HDF5 compound records with two
+little-endian 64-bit floating-point fields, ``r`` and ``i``. Standard
+h5py\ :sup:`10` reads these datasets as NumPy ``complex128`` arrays.
+A density matrix has shape ``(site, site)`` for a step and ``(time, site, site)``
+for a series. Populations have shape ``(site,)`` or ``(site, time)``.
+After ``walk.save_result('run', 'rho')``, load the result with h5py.
+
+.. code-block:: python
+
+    import h5py
+
+    with h5py.File('run.h5', 'r') as f:
+        rho = f['rho'][...]
+
+Superoperators use zero-based CSR datasets ``data``, ``indices`` and ``indptr``
+and a ``dimensions`` group attribute. They can be loaded with
+:meth:`~qsw_mpi.operators.import_superoperator`.
+
+The module
 :mod:`~qsw_mpi.operators` provides for creation of L-QSW and NM-G-QSW
 operators from :math:`\mathcal{G}` stored in the SciPy CSR matrix
 format\ :sup:`11`.

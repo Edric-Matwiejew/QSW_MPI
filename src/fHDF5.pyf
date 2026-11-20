@@ -1,0 +1,26 @@
+!    -*- f90 -*-
+python module fHDF5
+    interface
+        module parallel_io
+            subroutine open_file(name, comm, file)
+                character*(*) intent(in) :: name
+                integer intent(in) :: comm
+                integer(kind=8) intent(out) :: file
+            end subroutine open_file
+            subroutine write_dataset(file, name, comm, ndim, nblocks, offsets, counts, nbytes, buffer, status)
+                integer(kind=8) intent(in) :: file
+                character*(*) intent(in) :: name
+                integer intent(in) :: comm
+                integer intent(hide),depend(offsets) :: ndim=shape(offsets,0), nblocks=shape(offsets,1)
+                integer(kind=8) dimension(ndim,nblocks),intent(in) :: offsets, counts
+                integer(kind=8) intent(hide),depend(buffer) :: nbytes=shape(buffer,0)
+                integer(kind=1) dimension(nbytes),intent(in) :: buffer
+                integer intent(out) :: status
+            end subroutine write_dataset
+            subroutine close_file(file, status)
+                integer(kind=8) intent(in) :: file
+                integer intent(out) :: status
+            end subroutine close_file
+        end module parallel_io
+    end interface
+end python module fHDF5

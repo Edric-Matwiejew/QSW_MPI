@@ -384,16 +384,9 @@ class walk(object):
         Returns portion of :\\vec{p}: corresponding to the local partition of :math:`\\tilde{\mathcal{L}}`.
         """
 
-        pop_inds = []
-        for k in range(len(self.rho_v)):
-            i, j = self._matricize_index(k, self.partition_table[self.rank] - 1)
-            if i == j:
-                pop_inds.append(k)
-
-        if self.local_result.ndim == 1:
-            return np.take(self.local_result, pop_inds)
-        else:
-            return np.take(self.local_result, pop_inds, axis = 0)
+        stride = self.size[0] + 1
+        offset = int(self.partition_table[self.rank]) - 1
+        return np.ascontiguousarray(self.local_result[(-offset) % stride::stride])
 
     def gather_populations(self, root = 0):
         """
@@ -500,7 +493,8 @@ class walk(object):
 
             if self.rank == 0:
                 with h5py.File(filename + '.h5', action) as f:
-                   f.create_dataset(self._check_dataset_name(f, walkname, action), data = rhot)
+                    f.create_dataset(self._check_dataset_name(f, walkname, action),
+                                     data = rhot, dtype = pio.complex_dtype)
 
     def save_populations(self, filename, popname, action = 'a'):
         """
@@ -523,7 +517,7 @@ class walk(object):
 
             if self.rank == 0:
                 with h5py.File(filename + '.h5', action) as f:
-                    f.create_dataset(popname, data = populations)
+                    f.create_dataset(popname, data = populations, dtype = pio.complex_dtype)
 
     def save_superoperator(self, filename, operatorname, action = 'a'):
         """
@@ -548,7 +542,8 @@ class walk(object):
                 with h5py.File(filename + '.h5', action) as f:
                     f.create_dataset(self._check_dataset_name(f, operatorname + '/indptr', action), data = M.indptr)
                     f.create_dataset(self._check_dataset_name(f, operatorname + '/indices', action), data = M.indices)
-                    f.create_dataset(self._check_dataset_name(f, operatorname + '/data', action), data = M.data)
+                    f.create_dataset(self._check_dataset_name(f, operatorname + '/data', action),
+                                     data = M.data, dtype = pio.complex_dtype)
                     rows = f[operatorname + '/indptr'].shape[0] - 1
                     f[operatorname].attrs['dimensions'] = (rows, rows)
 
