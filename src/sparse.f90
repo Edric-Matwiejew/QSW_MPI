@@ -78,6 +78,8 @@ module Sparse
         integer :: LS_ind = 1
     end type SPA
 
+    real(dp), private, parameter :: spa_tolerance = epsilon(1.0_dp)
+
     contains
 
     !
@@ -198,14 +200,13 @@ module Sparse
         type(SPA), intent(inout) :: row_spa
         type(COO), intent(inout) :: A
         integer, intent(in) :: current_row
-        real(dp) :: x
         integer :: starting_nnz
         integer :: i
 
         starting_nnz = A%nnz
 
         do i = 1, row_spa%LS_ind - 1
-            if (abs(row_spa%w(row_spa%LS(i))) > epsilon(x)) then
+            if (abs(row_spa%w(row_spa%LS(i))) > spa_tolerance) then
                 A%nnz = A%nnz + 1
                 !A%row_indexes(A%nnz) = current_row
                 A%col_indexes(A%nnz) = row_spa%LS(i)
@@ -358,6 +359,61 @@ module Sparse
         C%columns = A%columns
 
     end subroutine COO_Sum
+
+    ! Add conjg(L) (x) L to B using only the rows owned by this rank.
+    subroutine Add_Jump_Product(L, B, first_row, last_row, C, MPI_communicator)
+        use iso_fortran_env, only: int64, error_unit
+        type(CSR), intent(in) :: L
+        type(COO), intent(in) :: B
+        integer, intent(in) :: first_row, last_row, MPI_communicator
+        type(COO), intent(out) :: C
+
+        type(SPA) :: row
+        integer(int64) :: local_nnz
+        integer :: pass, i, outer, inner, j, k, col, b_pos, ierr
+        complex(dp) :: factor
+
+        C%rows = L%rows**2
+        C%columns = L%columns**2
+        allocate(row%w(C%columns), row%b(C%columns), row%LS(C%columns))
+        local_nnz = 0
+        do pass = 1, 2
+            row%b = 0
+            b_pos = 1
+            do i = first_row, last_row
+                outer = (i - 1) / L%rows + 1
+                inner = mod(i - 1, L%rows) + 1
+                do j = L%row_starts(outer), L%row_starts(outer + 1) - 1
+                    col = (L%col_indexes(j) - 1) * L%columns
+                    factor = conjg(L%values(j))
+                    do k = L%row_starts(inner), L%row_starts(inner + 1) - 1
+                        call Scatter_SPA(row, factor * L%values(k), col + L%col_indexes(k), i)
+                    enddo
+                enddo
+                do while (b_pos <= B%nnz)
+                    if (B%row_indexes(b_pos) /= i) exit
+                    call Scatter_SPA(row, B%values(b_pos), B%col_indexes(b_pos), i)
+                    b_pos = b_pos + 1
+                enddo
+                if (pass == 1) then
+                    ! Count only after overlapping terms have been added.
+                    do j = 1, row%LS_ind - 1
+                        if (abs(row%w(row%LS(j))) > spa_tolerance) local_nnz = local_nnz + 1
+                    enddo
+                    row%LS_ind = 1
+                else
+                    call Gather_SPA(row, C, i)
+                endif
+            enddo
+            if (pass == 1) then
+                if (local_nnz > huge(C%nnz)) then
+                    write(error_unit,*) 'Local dissipator exceeds the COO index range:', local_nnz
+                    call MPI_Abort(MPI_communicator, 1, ierr)
+                endif
+                allocate(C%row_indexes(local_nnz), C%col_indexes(local_nnz), C%values(local_nnz))
+            endif
+        enddo
+    end subroutine Add_Jump_Product
 
     !> @brief Transpose a CSR matrix.
 

@@ -100,6 +100,12 @@ subroutine Generalized_Super_Operator_Extent(   taus, &
     M_nnz_out = size(M%col_indexes)
     M_rows = M%columns
 
+    deallocate(M%row_starts, M%col_indexes, M%values)
+    deallocate(H%row_starts, H%col_indexes, H%values)
+    do i = 1, L_n
+        deallocate(Ls(i)%row_starts, Ls(i)%col_indexes, Ls(i)%values)
+    enddo
+
 end subroutine Generalized_Super_Operator_Extent
 
 subroutine Generalized_Super_Operator(  taus, &
@@ -190,6 +196,12 @@ subroutine Generalized_Super_Operator(  taus, &
     M_row_starts(1:size(M%row_starts)) = M%row_starts
     M_col_indexes(1:size(M%col_indexes)) = M%col_indexes
     M_values(1:size(M%col_indexes)) = M%values
+
+    deallocate(M%row_starts, M%col_indexes, M%values)
+    deallocate(H%row_starts, H%col_indexes, H%values)
+    do i = 1, L_n
+        deallocate(Ls(i)%row_starts, Ls(i)%col_indexes, Ls(i)%values)
+    enddo
 
 end subroutine Generalized_Super_Operator
 

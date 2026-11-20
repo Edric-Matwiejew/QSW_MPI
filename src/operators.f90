@@ -1414,6 +1414,9 @@ module Operators
 
         call COO_Allocate_Sum(HSO1, HSO2, local_rows, HSO)
         call COO_Sum(HSO1, HSO2, HSO, partition_table, MPI_communicator)
+        call COO_Deallocate(HSO1)
+        call COO_Deallocate(HSO2)
+        deallocate(H_T%row_starts, H_T%col_indexes, H_T%values)
 
     end subroutine COO_Vectorized_Commutator
 
@@ -1442,19 +1445,11 @@ module Operators
         integer :: lower_offset, upper_offset
         integer :: local_rows
 
-        integer, dimension(:), allocatable :: row_nnzs
         integer :: indx
 
         integer :: i, j, k, ii, ll
 
         type(CSR), pointer :: L
-
-        !LSO1
-        type(COO) :: LSO1
-        integer :: L_row, L_nz
-        integer :: current_block
-        integer :: col_ind_disp
-        integer :: row_nz
 
         !LSO2
         type(COO) :: LSO2_elements
@@ -1490,47 +1485,8 @@ module Operators
 
         local_rows = upper_bound - lower_bound + 1
 
-        allocate(row_nnzs(lower_bound:upper_bound))
-
-
         do ii = 1, size(Ls, 1)
-
-            row_nnzs = 0
-
             L => Ls(ii)
-
-            LSO1%rows = L%rows**2
-            LSO1%columns = L%columns**2
-            allocate(LSO1%col_indexes(size(L%col_indexes)**2 + L%rows*LSO1%rows))
-            allocate(LSO1%row_indexes(size(L%col_indexes)**2 + L%rows*LSO1%rows))
-            allocate(LSO1%values(size(L%col_indexes)**2 + L%rows*LSO1%rows))
-
-            indx = 1
-
-            do i = lower_bound, upper_bound
-                L_row = i - (ceiling(i/float(L%rows)) - 1)*L%rows
-                L_nz = L%row_starts(L_row + 1) - L%row_starts(L_row)
-                current_block = ceiling(real(i)/L%rows)
-                col_ind_disp = 0
-                row_nz = L%row_starts(current_block + 1) - L%row_starts(current_block)
-                do j = 1, L%columns
-                   if (L%row_starts(current_block + 1) - L%row_starts(current_block) == 0) exit
-                    if (L%col_indexes(L%row_starts(current_block) + col_ind_disp) == j) then
-                        row_nnzs(i) = row_nnzs(i) + L%row_starts(L_row + 1) - L%row_starts(L_row)
-                        do k = L%row_starts(L_row), L%row_starts(L_row + 1) - 1
-                            LSO1%row_indexes(indx) = i
-                            LSO1%col_indexes(indx)  = (j - 1)*L%rows + L%col_indexes(k)
-                            LSO1%values(indx) = conjg(L%values(L%row_starts(current_block) &
-                                                    + col_ind_disp)) * L%values(k)
-                            LSO1%nnz = LSO1%nnz + 1
-                            indx = indx + 1
-                        enddo
-                        col_ind_disp = col_ind_disp + 1
-                        if (col_ind_disp == row_nz) exit
-                    endif
-                enddo
-            enddo
-
             call CSR_Transpose(L, L_T)
 
             allocate(LSO2_elements%row_indexes(L%rows**2))
@@ -1597,10 +1553,8 @@ module Operators
             enddo
         enddo
 
-            call COO_Allocate_Sum(LSO1, LSO2, local_rows, LSO_temp_1)
-            call COO_Sum(LSO1, LSO2, LSO_temp_1, partition_table, MPI_communicator)
+            call Add_Jump_Product(L, LSO2, lower_bound, upper_bound, LSO_temp_1, MPI_communicator)
 
-            call COO_Deallocate(LSO1)
             call COO_Deallocate(LSO2)
             call COO_Deallocate(LSO2_elements)
 
@@ -1628,6 +1582,8 @@ module Operators
                     endif
                 enddo
             enddo
+
+            deallocate(L_T%row_starts, L_T%col_indexes, L_T%values)
 
             allocate(LSO3%row_indexes(LSO3_elements%nnz*L%rows))
             allocate(LSO3%col_indexes(LSO3_elements%nnz*L%rows))
@@ -1766,6 +1722,7 @@ module Operators
         call COO_Deallocate(LSO)
 
         call COO_to_CSR(SO_COO, SO, partition_table, MPI_communicator)
+        call COO_Deallocate(SO_COO)
 
     end subroutine Generalized_Superoperator
 

@@ -768,14 +768,14 @@ class GKSL(walk):
         self.L_data = self.Ls[0].data
         self.L_indices = self.Ls[0].indices
         self.L_indptr = self.Ls[0].indptr
-        self.L_nnz = [self.Ls[0].count_nonzero()]
+        self.L_nnz = [self.Ls[0].nnz]
 
         if len(self.Ls) > 1:
             for i in range(1,len(self.Ls)):
                 self.L_data = np.concatenate((self.L_data, self.Ls[i].data))
                 self.L_indices = np.concatenate((self.L_indices, self.Ls[i].indices))
                 self.L_indptr = np.concatenate((self.L_indptr, self.Ls[i].indptr))
-                self.L_nnz.append(self.Ls[i].count_nonzero())
+                self.L_nnz.append(self.Ls[i].nnz)
 
         self.SO_nnz, self.SO_rows, self.partition_table = fMPI.generalized_super_operator_extent(
                 self.taus,
@@ -907,14 +907,14 @@ class GQSW(walk):
         self.L_data = self.Ls[0].data
         self.L_indices = self.Ls[0].indices
         self.L_indptr = self.Ls[0].indptr
-        self.L_nnz = [self.Ls[0].count_nonzero()]
+        self.L_nnz = [self.Ls[0].nnz]
 
         if len(self.Ls) > 1:
             for i in range(1,len(self.Ls)):
                 self.L_data = np.concatenate((self.L_data, self.Ls[i].data))
                 self.L_indices = np.concatenate((self.L_indices, self.Ls[i].indices))
                 self.L_indptr = np.concatenate((self.L_indptr, self.Ls[i].indptr))
-                self.L_nnz.append(self.Ls[i].count_nonzero())
+                self.L_nnz.append(self.Ls[i].nnz)
 
         self.SO_nnz, self.SO_rows, self.partition_table = fMPI.demoralized_super_operator_extent(
                 self.omega,
