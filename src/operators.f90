@@ -1556,7 +1556,8 @@ module Operators
                             LSO2_elements%row_indexes(LSO2_elements%nnz) = i
                             LSO2_elements%col_indexes(LSO2_elements%nnz)  = j
                             LSO2_elements%values(LSO2_elements%nnz) = value
-                        if(((1 + lower_offset) == i) &
+                        ! The first local row of L^dagger L may be empty.
+                        if((i >= 1 + lower_offset) &
                             .and. (lb_indx == 0)) then
                             lb_indx = LSO2_elements%nnz
                         endif
@@ -1584,7 +1585,7 @@ module Operators
             else
                 offset = 1
             endif
-            do j = offset, LSO2_elements%nnz
+            do j = offset, merge(ub_indx, LSO2_elements%nnz, i == upper_block)
                 row_index = (i-1)*L%rows + LSO2_elements%row_indexes(j)
                 col_index = (i-1)*L%columns + LSO2_elements%col_indexes(j)
 
@@ -1593,7 +1594,6 @@ module Operators
                 LSO2%row_indexes(LSO2%nnz) = row_index
                 LSO2%col_indexes(LSO2%nnz) = col_index
                 LSO2%values(LSO2%nnz) = -0.5d0 * LSO2_elements%values(j)
-                if ((i == upper_block) .and. (j == ub_indx)) exit
             enddo
         enddo
 
@@ -1688,13 +1688,12 @@ module Operators
 
                     call COO_Move(LSO, LSO_temp_3)
 
+                    LSO_temp_2%values(:LSO_temp_2%nnz) = taus(ii)*LSO_temp_2%values(:LSO_temp_2%nnz)
                     call COO_Allocate_Sum(LSO_temp_2, LSO_temp_3, local_rows, LSO)
                     call COO_Sum(LSO_temp_2, LSO_temp_3, LSO, partition_table, MPI_communicator)
 
                     call COO_Deallocate(LSO_temp_2)
                     call COO_Deallocate(LSO_temp_3)
-
-                    LSO%values = taus(ii)*LSO%values
 
                 endif
 
@@ -1938,7 +1937,8 @@ module Operators
 
                 indx = (i - 1)*size(O, 1) + j
 
-                O_v(indx) = O(i, j)
+                ! The superoperator acts on columns stacked consecutively.
+                O_v(indx) = O(j, i)
 
             enddo
 
