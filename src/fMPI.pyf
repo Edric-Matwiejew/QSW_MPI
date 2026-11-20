@@ -1,8 +1,50 @@
 !    -*- f90 -*-
 ! Note: the context of this file is case sensitive.
 
+python module build_gksl__user__routines
+    interface
+        subroutine receive_csr(nptr, nnz, ptr, cols, vals)
+            integer intent(hide) :: nptr, nnz
+            integer dimension(nptr),intent(in) :: ptr
+            integer dimension(nnz),intent(in) :: cols
+            complex*16 dimension(nnz),intent(in) :: vals
+        end subroutine receive_csr
+    end interface
+end python module build_gksl__user__routines
+
+python module build_communications__user__routines
+    interface
+        subroutine receive_send_indices(n, indices)
+            integer intent(hide) :: n
+            integer dimension(n),intent(in) :: indices
+        end subroutine receive_send_indices
+    end interface
+end python module build_communications__user__routines
+
 python module fMPI ! in
 	interface  ! in :fMPI
+		subroutine build_gksl(taus,h_rows,h_nnz,h_row_starts,h_col_indexes,h_values,l_n,l_nnz,l_row_total,l_nnz_total,l_row_starts,l_col_indexes,l_values,flock,mpi_communicator,m_nnz_out,m_rows,partition_table,receive_csr) ! in fMPI.f90
+                    use build_gksl__user__routines
+                    external receive_csr
+		    real(kind=dp) dimension(l_n),intent(in) :: taus
+		    integer, optional,intent(in),check((len(h_row_starts)-1)>=h_rows),depend(h_row_starts) :: h_rows=(len(h_row_starts)-1)
+		    integer, optional,intent(in),check(len(h_col_indexes)>=h_nnz),depend(h_col_indexes) :: h_nnz=len(h_col_indexes)
+		    integer dimension(h_rows + 1),intent(in) :: h_row_starts
+		    integer dimension(h_nnz),intent(in) :: h_col_indexes
+		    complex(kind=dp) dimension(h_nnz),intent(in),depend(h_nnz) :: h_values
+		    integer, optional,intent(in),check(len(taus)>=l_n),depend(taus) :: l_n=len(taus)
+		    integer dimension(l_n),intent(in),depend(l_n) :: l_nnz
+		    integer, optional,intent(in),check(len(l_row_starts)>=l_row_total),depend(l_row_starts) :: l_row_total=len(l_row_starts)
+		    integer, optional,intent(in),check(len(l_col_indexes)>=l_nnz_total),depend(l_col_indexes) :: l_nnz_total=len(l_col_indexes)
+		    integer dimension(l_row_total),intent(in) :: l_row_starts
+		    integer dimension(l_nnz_total),intent(in) :: l_col_indexes
+		    complex(kind=dp) dimension(l_nnz_total),intent(in),depend(l_nnz_total) :: l_values
+		    integer intent(in) :: flock
+		    integer intent(in) :: mpi_communicator
+		    integer intent(out) :: m_nnz_out
+		    integer intent(out) :: m_rows
+		    integer dimension(flock + 1),intent(out),depend(flock) :: partition_table
+		end subroutine build_gksl
 		subroutine generalized_super_operator_extent(taus,h_rows,h_nnz,h_row_starts,h_col_indexes,h_values,l_n,l_nnz,l_row_total,l_nnz_total,l_row_starts,l_col_indexes,l_values,flock,mpi_communicator,m_nnz_out,m_rows,partition_table) ! in fMPI.f90
 		    real(kind=dp) dimension(l_n),intent(in) :: taus
 		    integer, optional,intent(in),check((len(h_row_starts)-1)>=h_rows),depend(h_row_starts) :: h_rows=(len(h_row_starts)-1)
@@ -144,6 +186,17 @@ python module fMPI ! in
 		    integer dimension(m_nnz_in),intent(out),depend(m_nnz_in) :: m_col_indexes
 		    complex(kind=dp) dimension(m_nnz_in),intent(out),depend(m_nnz_in) :: m_values
 		end subroutine super_operator
+        subroutine build_communications(nnz,cols,flock,partition_table,comm,receive_send_indices,local_cols,rec_counts,rec_disps,send_counts,send_disps)
+            use build_communications__user__routines
+            external receive_send_indices
+            integer intent(hide),depend(cols) :: nnz=len(cols)
+            integer dimension(nnz),intent(in) :: cols
+            integer intent(hide),depend(partition_table) :: flock=len(partition_table)-1
+            integer dimension(flock+1),intent(in) :: partition_table
+            integer intent(in) :: comm
+            integer dimension(nnz),intent(out) :: local_cols
+            integer dimension(flock),intent(out) :: rec_counts,rec_disps,send_counts,send_disps
+        end subroutine build_communications
 		subroutine rec_a(m_rows,m_n_row_starts,m_n_col_indexes,m_row_starts,m_col_indexes,flock,partition_table,mpi_communicator,m_num_rec_inds,m_rec_disps,m_num_send_inds,m_send_disps) ! in fMPI.f90
 		    integer intent(in) :: m_rows
 		    integer, optional,intent(in),check(len(m_row_starts)>=m_n_row_starts),depend(m_row_starts) :: m_n_row_starts=len(m_row_starts)

@@ -133,45 +133,18 @@ def save_populations(self, filename, popname, action = 'a'):
 
 def save_superoperator(self, filename, operatorname, action = 'a'):
 
-    f = h5py.File(filename + '.h5', action, driver = 'mpio', comm = self.MPI_communicator)
+    comm = self.MPI_communicator
+    start = int(self.SO_row_starts[0]) - 1
+    end = start + int(self.SO_nnz)
+    total = comm.bcast(end, root=self.flock - 1)
+    first_row = int(self.partition_table[self.rank]) - 1
+    row_count = int(self.SO_local_rows) + int(self.rank == self.flock - 1)
 
-    save_counts = np.array(self.MPI_communicator.allgather(len(self.M_values)))
-
-    rs_save_counts = np.array([self.partition_table[i + 1] - self.partition_table[i] for i in range(self.flock)])
-    rs_save_counts[-1] += 1
-
-    bounds = self.__counts_to_offsets(save_counts)
-    rs_bounds = self.__counts_to_offsets(rs_save_counts)
-
-    # Save row starts.
-    dset = f.create_dataset(
-            operatorname + '/indptr',
-            (rs_bounds[-1],),
-            dtype = np.int64)
-
-    if self.rank + 1 == self.flock:
-        dset[rs_bounds[self.rank]:rs_bounds[self.rank + 1]] = self.M_row_starts - 1
-    else:
-        dset[rs_bounds[self.rank]:rs_bounds[self.rank + 1]] = self.M_row_starts[0:-1] - 1
-
-    # Save column_indices.
-    dset = f.create_dataset(
-            operatorname + '/indices',
-            (bounds[-1],),
-            dtype = np.int64)
-
-    dset[bounds[self.rank]:bounds[self.rank + 1]] = self.M_col_indexes - 1
-
-    # Save values.
-    dset = f.create_dataset(
-            operatorname + '/data',
-            (bounds[-1],),
-            dtype = np.complex128)
-
-    dset[bounds[self.rank]:bounds[self.rank + 1]] = self.M_values
-
-    f[operatorname].attrs['dimensions'] = (self.M_rows, self.M_rows)
-
-    f.close()
-
-
+    with h5py.File(filename + '.h5', action, driver='mpio', comm=comm) as f:
+        pointers = f.create_dataset(operatorname + '/indptr', (self.SO_rows + 1,), dtype=np.int64)
+        columns = f.create_dataset(operatorname + '/indices', (total,), dtype=self.SO_col_indexes.dtype)
+        values = f.create_dataset(operatorname + '/data', (total,), dtype=np.complex128)
+        pointers[first_row:first_row + row_count] = self.SO_row_starts[:row_count] - 1
+        columns[start:end] = self.SO_col_indexes - 1
+        values[start:end] = self.SO_values
+        f[operatorname].attrs['dimensions'] = (self.SO_rows, self.SO_rows)

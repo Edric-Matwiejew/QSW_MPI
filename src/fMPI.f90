@@ -14,24 +14,9 @@
 !   You should have received a copy of the GNU General Public License
 !   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-subroutine Generalized_Super_Operator_Extent(   taus, &
-                                                H_rows, &
-                                                H_nnz, &
-                                                H_row_starts, &
-                                                H_col_indexes, &
-                                                H_values, &
-                                                L_n, &
-                                                L_nnz, &
-                                                L_row_total, &
-                                                L_nnz_total, &
-                                                L_row_starts, &
-                                                L_col_indexes, &
-                                                L_values, &
-                                                flock, &
-                                                MPI_communicator, &
-                                                M_nnz_out, &
-                                                M_rows, &
-                                                partition_table)
+subroutine Build_GKSL(taus, H_rows, H_nnz, H_row_starts, H_col_indexes, H_values, &
+                      L_n, L_nnz, L_row_total, L_nnz_total, L_row_starts, L_col_indexes, L_values, &
+                      flock, MPI_communicator, M_nnz_out, M_rows, partition_table, receive_csr)
 
     use :: iso_precisions
     use :: sparse
@@ -40,6 +25,7 @@ subroutine Generalized_Super_Operator_Extent(   taus, &
 
     implicit none
 
+    external receive_csr
     integer, intent(in) :: H_rows
     integer, intent(in) :: H_nnz
     integer, dimension(H_rows + 1), intent(in) :: H_row_starts
@@ -94,19 +80,79 @@ subroutine Generalized_Super_Operator_Extent(   taus, &
                                     Ls, &
                                     partition_table_temp, &
                                     M, &
-                                    MPI_communicator)
+                                    MPI_communicator, local_pointers=.true.)
 
     partition_table = partition_table_temp
     M_nnz_out = size(M%col_indexes)
     M_rows = M%columns
 
-    deallocate(M%row_starts, M%col_indexes, M%values)
     deallocate(H%row_starts, H%col_indexes, H%values)
     do i = 1, L_n
         deallocate(Ls(i)%row_starts, Ls(i)%col_indexes, Ls(i)%values)
     enddo
 
+    call receive_csr(size(M%row_starts), M_nnz_out, M%row_starts, M%col_indexes, M%values)
+
+    deallocate(M%row_starts, M%col_indexes, M%values)
+
+end subroutine Build_GKSL
+
+subroutine Generalized_Super_Operator_Extent(   taus, &
+                                                H_rows, &
+                                                H_nnz, &
+                                                H_row_starts, &
+                                                H_col_indexes, &
+                                                H_values, &
+                                                L_n, &
+                                                L_nnz, &
+                                                L_row_total, &
+                                                L_nnz_total, &
+                                                L_row_starts, &
+                                                L_col_indexes, &
+                                                L_values, &
+                                                flock, &
+                                                MPI_communicator, &
+                                                M_nnz_out, &
+                                                M_rows, &
+                                                partition_table)
+
+    use :: iso_precisions
+
+    implicit none
+
+    integer, intent(in) :: H_rows
+    integer, intent(in) :: H_nnz
+    integer, dimension(H_rows + 1), intent(in) :: H_row_starts
+    integer, dimension(H_nnz), intent(in) :: H_col_indexes
+    complex(dp), dimension(H_nnz), intent(in) :: H_values
+    integer, intent(in) :: L_n
+    real(dp), dimension(L_n), intent(in) :: taus
+    integer, dimension(L_n), intent(in) :: L_nnz
+    integer, intent(in) :: L_row_total
+    integer, intent(in) :: L_nnz_total
+    integer, dimension(L_row_total), intent(in) :: L_row_starts
+    integer, dimension(L_nnz_total), intent(in) :: L_col_indexes
+    complex(dp), dimension(L_nnz_total), intent(in) :: L_values
+    integer, intent(in) :: flock
+    integer, intent(in) :: MPI_communicator
+    integer, intent(out) :: M_nnz_out
+    integer, intent(out) :: M_rows
+    integer, dimension(flock + 1), intent(out) :: partition_table
+
+    external discard_gksl_slice
+    call Build_GKSL(taus, H_rows, H_nnz, H_row_starts, H_col_indexes, H_values, &
+                    L_n, L_nnz, L_row_total, L_nnz_total, L_row_starts, L_col_indexes, L_values, &
+                    flock, MPI_communicator, M_nnz_out, M_rows, partition_table, discard_gksl_slice)
+
 end subroutine Generalized_Super_Operator_Extent
+
+! Compatibility with callers which request only the extent.
+subroutine discard_gksl_slice(nptr, nnz, ptr, cols, vals)
+    use :: iso_precisions
+    implicit none
+    integer, intent(in) :: nptr, nnz, ptr(nptr), cols(nnz)
+    complex(dp), intent(in) :: vals(nnz)
+end subroutine discard_gksl_slice
 
 subroutine Generalized_Super_Operator(  taus, &
                                         H_rows, &
@@ -920,7 +966,7 @@ subroutine one_norm_series( M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
         M%RHS_send_inds(1:size(M_RHS_send_inds)) => M_RHS_send_inds
 
-        call CSR_Dagger(M, partition_table, M_T, MPI_communicator)
+        call CSR_Dagger(M, partition_table, M_T, MPI_communicator, local_pointers=.true.)
 
         call Reconcile_Communications(  M_T, &
                                         partition_table, &

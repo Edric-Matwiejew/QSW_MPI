@@ -231,7 +231,7 @@ module Expm
             call CSR_Dagger(A, &
                             partition_table, &
                             A_T, &
-                            MPI_communicator)
+                            MPI_communicator, local_pointers=.true.)
 
             call Reconcile_Communications(  A_T, &
                                             partition_table, &

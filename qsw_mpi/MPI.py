@@ -25,6 +25,35 @@ import qsw_mpi.parallel_io as pio
 from time import time
 from warnings import warn
 
+_MPI_COUNT_MAX = int(np.iinfo(np.int32).max)
+
+
+def _nnz_offsets(comm, local_nnz):
+    """Zero-based global offsets, including the end of the last rank's slice."""
+    counts = np.empty(comm.size, dtype=np.int64)
+    comm.Allgather(np.int64(local_nnz), counts)
+    if np.any(counts < 0):
+        raise MemoryError("A rank could not copy its assembled GKSL matrix")
+    offsets = np.empty(comm.size + 1, dtype=np.int64)
+    offsets[0] = 0
+    np.cumsum(counts, out=offsets[1:])
+    return offsets
+
+
+def _gather_csr_array(comm, local, offsets, output, root):
+    """Gather contiguous slices using displacements representable by MPI-3."""
+    total = int(offsets[-1])
+    for start in range(0, total, _MPI_COUNT_MAX):
+        end = min(start + _MPI_COUNT_MAX, total)
+        # Intersect each rank's slice with this window into the receive buffer.
+        cuts = np.clip(offsets, start, end) - start
+        counts = np.diff(cuts).astype(np.int32)
+        local_start = max(0, start - int(offsets[comm.rank]))
+        send = local[local_start:local_start + int(counts[comm.rank])]
+        recv = (output[start:end], (counts, cuts[:-1].astype(np.int32))) if comm.rank == root else None
+        comm.Gatherv(send, recv, root=root)
+
+
 class walk(object):
 
     """
@@ -102,10 +131,11 @@ class walk(object):
         Analyses the structure of :math:`\\tilde{\mathcal{L}}` to optimise MPI communication of :math:`\\tilde{\\rho}(t)` during sparse-matrix multiplication.
         """
         self.rec_time = time()
+        self._kernel_row_starts = getattr(self, '_local_row_starts', self.SO_row_starts)
 
         self.SO_num_rec_inds, self.SO_rec_disps, self.SO_num_send_inds, self.SO_send_disps = fMPI.rec_a(
                 self.SO_rows,
-                self.SO_row_starts,
+                self._kernel_row_starts,
                 self.SO_col_indexes,
                 self.partition_table,
                 self.MPI_communicator.py2f())
@@ -113,7 +143,7 @@ class walk(object):
         self.SO_local_col_inds, self.SO_rhs_send_inds = fMPI.rec_b(
                 self.SO_rows,
                 np.sum(self.SO_num_send_inds),
-                self.SO_row_starts,
+                self._kernel_row_starts,
                 self.SO_col_indexes,
                 self.SO_num_rec_inds,
                 self.SO_rec_disps,
@@ -132,7 +162,7 @@ class walk(object):
 
         self.one_norms, self.p = fMPI.one_norm_series(
                 self.SO_rows,
-                self.SO_row_starts,
+                self._kernel_row_starts,
                 self.SO_col_indexes,
                 self.SO_values,
                 self.SO_num_rec_inds,
@@ -233,7 +263,7 @@ class walk(object):
         self.local_result = fMPI.step(
                 self.SO_rows,
                 self.SO_local_rows,
-                self.SO_row_starts,
+                self._kernel_row_starts,
                 self.SO_col_indexes,
                 self.SO_values,
                 self.SO_num_rec_inds,
@@ -283,7 +313,7 @@ class walk(object):
         self.local_result = fMPI.series(
                 self.SO_rows,
                 self.SO_local_rows,
-                self.SO_row_starts,
+                self._kernel_row_starts,
                 self.SO_col_indexes,
                 self.SO_values,
                 self.SO_num_rec_inds,
@@ -415,32 +445,31 @@ class walk(object):
         :rtype: :math:`\\tilde{N}^2 \\times \\tilde{N}^2` SciPY CSR matrix
         """
 
-        send_counts = np.array(self.MPI_communicator.gather(len(self.SO_values),root))
-
-        rs_send_counts = np.array([self.partition_table[i + 1] - self.partition_table[i] for i in range(self.flock)])
-        rs_send_counts[-1] += 1
-
+        comm = self.MPI_communicator
+        offsets = _nnz_offsets(comm, len(self.SO_values))
+        row_offsets = self.partition_table.astype(np.int64) - 1
+        row_offsets[-1] += 1  # Only the last rank sends the final CSR pointer.
+        row_count = row_offsets[self.rank + 1] - row_offsets[self.rank]
+        values = columns = pointers = None
+        allocation_ok = True
         if self.rank == root:
-            M_values = np.empty(np.sum(send_counts), dtype = np.complex128)
-            M_col_indexes = np.empty(np.sum(send_counts), dtype = np.int32)
-            M_row_starts = np.empty(np.sum(rs_send_counts), dtype = np.int32)
-        else:
-            M_values = None
-            M_col_indexes = None
-            M_row_starts = None
+            try:
+                values = np.empty(offsets[-1], dtype=np.complex128)
+                columns = np.empty(offsets[-1], dtype=np.int32)
+                pointers = np.empty(row_offsets[-1], dtype=np.int64)
+            except MemoryError:
+                allocation_ok = False
+        if not comm.bcast(allocation_ok, root=root):
+            raise MemoryError("The gather root could not allocate the global CSR matrix")
 
-        self.MPI_communicator.Gatherv(self.SO_values, (M_values, send_counts), root)
-        self.MPI_communicator.Gatherv(self.SO_col_indexes, (M_col_indexes, send_counts), root)
-
-        if self.rank == self.flock - 1:
-            self.MPI_communicator.Gatherv(self.SO_row_starts[0:len(self.SO_row_starts)], (M_row_starts, rs_send_counts), root)
-        else:
-            self.MPI_communicator.Gatherv(self.SO_row_starts[0:len(self.SO_row_starts) - 1], (M_row_starts, rs_send_counts), root)
-
+        _gather_csr_array(comm, self.SO_values, offsets, values, root)
+        _gather_csr_array(comm, self.SO_col_indexes, offsets, columns, root)
+        _gather_csr_array(comm, self.SO_row_starts[:row_count].astype(np.int64, copy=False),
+                          row_offsets, pointers, root)
         if self.rank == root:
-            return sp.csr_matrix((M_values, M_col_indexes - 1, M_row_starts - 1), (self.SO_rows, self.SO_rows))
-        else:
-            return None
+            columns -= 1
+            pointers -= 1
+            return sp.csr_matrix((values, columns, pointers), shape=(self.SO_rows, self.SO_rows))
 
     def save_result(self, filename, walkname, action = 'a'):
         """
@@ -511,6 +540,8 @@ class walk(object):
                     f.create_dataset(self._check_dataset_name(f, operatorname + '/indptr', action), data = M.indptr)
                     f.create_dataset(self._check_dataset_name(f, operatorname + '/indices', action), data = M.indices)
                     f.create_dataset(self._check_dataset_name(f, operatorname + '/data', action), data = M.data)
+                    rows = f[operatorname + '/indptr'].shape[0] - 1
+                    f[operatorname].attrs['dimensions'] = (rows, rows)
 
 class LQSW(walk):
     """
@@ -715,6 +746,11 @@ class GKSL(walk):
     """
     :class:`~qsw_mpi.MPI.GKSL` provides for the simulation of systems obeying the GKSL master equation in its diagonalised form (see Equation :eq:`eq:gksl`).
 
+    Each rank assembles its slice once. Global one-based CSR row pointers
+    (SO_row_starts) use int64. Local pointers, column indices and MPI kernel
+    counts use int32. Global rows and local nonzero counts, including the
+    adjoint used for norm estimation, must fit with their one-based sentinel.
+
     :param H: Hamiltonian, :math:`H`.
     :type H: :math:`N \\times N` complex SciPy CSR
 
@@ -764,6 +800,12 @@ class GKSL(walk):
         """
         self.construct_time = time()
 
+        if self.size[0]**2 >= _MPI_COUNT_MAX:
+            raise OverflowError("GKSL row count and its one-based sentinel must fit in int32")
+        if (sum(L.nnz for L in self.Ls) >= _MPI_COUNT_MAX
+                or len(self.Ls) * (self.size[0] + 1) > _MPI_COUNT_MAX):
+            raise OverflowError("Packed Lindblad inputs exceed the int32 interface")
+
         # Pack Ls
         self.L_data = self.Ls[0].data
         self.L_indices = self.Ls[0].indices
@@ -777,7 +819,17 @@ class GKSL(walk):
                 self.L_indptr = np.concatenate((self.L_indptr, self.Ls[i].indptr))
                 self.L_nnz.append(self.Ls[i].nnz)
 
-        self.SO_nnz, self.SO_rows, self.partition_table = fMPI.generalized_super_operator_extent(
+        def receive_csr(ptr, cols, vals):
+            # The native arrays are released immediately after the callback.
+            try:
+                self._local_row_starts = ptr.copy() if ptr.size > 1 else np.repeat(ptr, 2)
+                self.SO_row_starts = self._local_row_starts.astype(np.int64)
+                self.SO_col_indexes = cols.copy()
+                self.SO_values = vals.copy()
+            except MemoryError:
+                self._local_row_starts = None
+
+        self.SO_nnz, self.SO_rows, self.partition_table = fMPI.build_gksl(
                 self.taus,
                 self.H.indptr,
                 self.H.indices,
@@ -787,24 +839,14 @@ class GKSL(walk):
                 self.L_indices,
                 self.L_data,
                 self.flock,
-                self.MPI_communicator.py2f())
-
-        self.SO_local_rows = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
-        self.SO_n_row_starts = np.max([2, self.SO_local_rows + 1])
-
-        self.SO_row_starts, self.SO_col_indexes, self.SO_values = fMPI.generalized_super_operator(
-                self.taus,
-                self.H.indptr,
-                self.H.indices,
-                self.H.data,
-                self.L_nnz,
-                self.L_indptr,
-                self.L_indices,
-                self.L_data,
-                self.partition_table,
                 self.MPI_communicator.py2f(),
-                self.SO_nnz,
-                self.SO_n_row_starts)
+                receive_csr)
+
+        copied_nnz = self.SO_nnz if self._local_row_starts is not None else -1
+        offsets = _nnz_offsets(self.MPI_communicator, copied_nnz)
+        self.SO_row_starts += offsets[self.rank]
+        self.SO_local_rows = self.partition_table[self.rank + 1] - self.partition_table[self.rank]
+        self.SO_n_row_starts = self._local_row_starts.size
 
         self.construct_time = time() - self.construct_time
 

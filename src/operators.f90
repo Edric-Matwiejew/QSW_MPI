@@ -1339,10 +1339,10 @@ module Operators
 
         type(CSR) :: H_T
         type(COO) :: HSO1, HSO2
-        integer :: HSO1_nnz, HSO2_nnz
+        integer(int64) :: HSO1_nnz, HSO2_nnz
 
         integer :: lower_bound, upper_bound, lower_block, upper_block
-        integer :: lower_offset, upper_offset
+        integer :: lower_offset, upper_offset, first, last
         integer :: local_rows
         integer :: row_index, col_index
         integer :: i, j, k
@@ -1356,8 +1356,8 @@ module Operators
         lower_bound = partition_table(rank + 1)
         upper_bound = partition_table(rank + 2) - 1
 
-        lower_block = ceiling(real(lower_bound)/H%rows)
-        upper_block = ceiling(real(upper_bound)/H%rows)
+        lower_block = (lower_bound - 1)/H%rows + 1
+        upper_block = int((int(upper_bound, int64) + H%rows - 1)/H%rows)
 
         lower_offset = (lower_bound - (lower_block - 1)*H%rows) - 1
         upper_offset = (upper_bound - (upper_block - 1)*H%rows) - H%rows
@@ -1367,7 +1367,17 @@ module Operators
         HSO1%rows = H%rows**2
         HSO1%columns = H%columns**2
 
-        HSO1_nnz = size(H%col_indexes)*(upper_block - lower_block + 2)
+        call CSR_Transpose(H, H_T)
+        HSO1_nnz = 0
+        HSO2_nnz = 0
+        do i = lower_block, upper_block
+            first = 1 + merge(lower_offset, 0, i == lower_block)
+            last = H%rows + merge(upper_offset, 0, i == upper_block)
+            HSO1_nnz = HSO1_nnz + (H%row_starts(last + 1) - H%row_starts(first))
+            HSO2_nnz = HSO2_nnz + int(last - first + 1, int64)*(H_T%row_starts(i + 1) - H_T%row_starts(i))
+        enddo
+        call Check_Local_Nnz(HSO1_nnz, MPI_communicator)
+        call Check_Local_Nnz(HSO2_nnz, MPI_communicator)
         allocate(HSO1%row_indexes(HSO1_nnz))
         allocate(HSO1%col_indexes(HSO1_nnz))
         allocate(HSO1%values(HSO1_nnz))
@@ -1388,11 +1398,6 @@ module Operators
 
         HSO2%rows = H%rows**2
         HSO2%columns = H%columns**2
-
-        call CSR_Transpose(H, H_T)
-
-        HSO2_nnz = H%rows*maxval(H%row_starts(2:size(H%row_starts)) - &
-            H%row_starts(1:size(H%row_starts)-1))*(upper_block - lower_block + 1)
 
         allocate(HSO2%row_indexes(HSO2_nnz))
         allocate(HSO2%col_indexes(HSO2_nnz))
@@ -1455,7 +1460,8 @@ module Operators
         type(COO) :: LSO2_elements
         type(COO) :: LSO2
         type(CSR) :: L_T
-        integer :: lb_indx, ub_indx
+        integer :: lb_indx, ub_indx, first, last
+        integer(int64) :: term_nnz
         integer :: offset
         integer :: col_index, row_index
         complex(dp) :: value
@@ -1477,8 +1483,8 @@ module Operators
         lower_bound = partition_table(rank + 1)
         upper_bound = partition_table(rank + 2) - 1
 
-        lower_block = ceiling(real(lower_bound)/Ls(1)%rows)
-        upper_block = ceiling(real(upper_bound)/Ls(1)%rows)
+        lower_block = (lower_bound - 1)/Ls(1)%rows + 1
+        upper_block = int((int(upper_bound, int64) + Ls(1)%rows - 1)/Ls(1)%rows)
 
         lower_offset = (lower_bound - (lower_block - 1)*Ls(1)%rows) - 1
         upper_offset = (upper_bound - (upper_block - 1)*Ls(1)%rows) - Ls(1)%rows
@@ -1530,9 +1536,14 @@ module Operators
             lb_indx = LSO2_elements%nnz + 1
         endif
 
-        allocate(LSO2%row_indexes(LSO2_elements%nnz*(upper_block - lower_block + 1)*2))
-        allocate(LSO2%col_indexes(LSO2_elements%nnz*(upper_block - lower_block + 1)*2))
-        allocate(LSO2%values(LSO2_elements%nnz*(upper_block - lower_block + 1)*2))
+        term_nnz = 0
+        do i = lower_block, upper_block
+            first = merge(lb_indx, 1, i == lower_block)
+            last = merge(ub_indx, LSO2_elements%nnz, i == upper_block)
+            term_nnz = term_nnz + max(0, last - first + 1)
+        enddo
+        call Check_Local_Nnz(term_nnz, MPI_communicator)
+        allocate(LSO2%row_indexes(term_nnz), LSO2%col_indexes(term_nnz), LSO2%values(term_nnz))
 
         indx = 1
         do i = lower_block, upper_block
@@ -1563,7 +1574,11 @@ module Operators
             allocate(LSO3_elements%col_indexes(L%rows**2))
             allocate(LSO3_elements%values(L%rows**2))
 
+            term_nnz = 0
             do i = lower_block, upper_block
+                first = 1 + merge(lower_offset, 0, i == lower_block)
+                last = L%rows + merge(upper_offset, 0, i == upper_block)
+                if (last < first) cycle
                 do j = 1, L%rows
                     value = 0
                     do k = L_T%row_starts(i), L_T%row_starts(i + 1) - 1
@@ -1575,6 +1590,7 @@ module Operators
                         enddo
                     enddo
                     if (abs(value) > epsilon(real(value))) then
+                        term_nnz = term_nnz + (last - first + 1)
                         LSO3_elements%nnz = LSO3_elements%nnz + 1
                         LSO3_elements%row_indexes(LSO3_elements%nnz) = i
                         LSO3_elements%col_indexes(LSO3_elements%nnz) = j
@@ -1585,9 +1601,8 @@ module Operators
 
             deallocate(L_T%row_starts, L_T%col_indexes, L_T%values)
 
-            allocate(LSO3%row_indexes(LSO3_elements%nnz*L%rows))
-            allocate(LSO3%col_indexes(LSO3_elements%nnz*L%rows))
-            allocate(LSO3%values(LSO3_elements%nnz*L%rows))
+            call Check_Local_Nnz(term_nnz, MPI_communicator)
+            allocate(LSO3%row_indexes(term_nnz), LSO3%col_indexes(term_nnz), LSO3%values(term_nnz))
 
             indx = 1
             do i = lower_block, upper_block
@@ -1680,7 +1695,7 @@ module Operators
                                             Ls, &
                                             partition_table, &
                                             SO, &
-                                            MPI_communicator)
+                                            MPI_communicator, local_pointers)
 
         real(dp), dimension(:), intent(in) :: taus !> @param Lindblad operator coefficients.
         type(CSR), intent(in) :: H !> CSR matrix Hamiltonian.
@@ -1688,6 +1703,8 @@ module Operators
         integer, dimension(:), intent(in) :: partition_table !> Distributed row partitions.
         type(CSR), intent(inout) :: SO !> CSR matrix superoperator.
         integer, intent(in) :: MPI_communicator !> MPI communicator over which to generate SO.
+
+        logical, optional, intent(in) :: local_pointers
 
         integer :: local_rows
 
@@ -1703,6 +1720,13 @@ module Operators
         call MPI_comm_rank(MPI_communicator, rank, ierr)
 
         local_rows = partition_table(rank + 2) - partition_table(rank +1)
+
+        if (local_rows == 0) then
+            SO_COO%rows = H%rows**2
+            SO_COO%columns = H%columns**2
+            call COO_to_CSR(SO_COO, SO, partition_table, MPI_communicator, local_pointers)
+            return
+        endif
 
         call COO_Vectorized_Commutator( H, &
                                         partition_table, &
@@ -1721,7 +1745,7 @@ module Operators
         call COO_Deallocate(HSO)
         call COO_Deallocate(LSO)
 
-        call COO_to_CSR(SO_COO, SO, partition_table, MPI_communicator)
+        call COO_to_CSR(SO_COO, SO, partition_table, MPI_communicator, local_pointers)
         call COO_Deallocate(SO_COO)
 
     end subroutine Generalized_Superoperator

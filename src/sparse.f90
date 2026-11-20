@@ -23,6 +23,7 @@
 !
 module Sparse
 
+    use iso_fortran_env, only: int64, error_unit
     use :: ISO_Precisions
     use :: MPI
 
@@ -94,7 +95,7 @@ module Sparse
         integer :: Kronecker_Delta
         integer, intent(in) :: i, j
 
-        Kronecker_Delta = int((real((i+j)-abs(i-j)))/(real((i+j)+abs(i-j))))
+        Kronecker_Delta = merge(1, 0, i == j)
 
     end function Kronecker_Delta
 
@@ -124,24 +125,46 @@ module Sparse
     ! COO (Compressed Co-ordiantes) subroutines.
     !
 
+    ! One-based element origin. Python's GKSL path keeps the native CSR local.
+    integer function CSR_Element_Start(local_nnz, rank, comm, local_pointers) result(first)
+        integer(int64), intent(in) :: local_nnz
+        integer, intent(in) :: rank, comm
+        logical, optional, intent(in) :: local_pointers
+        logical :: global_pointers
+        integer(int64) :: offset
+        integer :: ierr
+
+        global_pointers = .true.
+        if (present(local_pointers)) global_pointers = .not. local_pointers
+        offset = 0_int64
+        if (global_pointers) then
+            call MPI_Exscan(local_nnz, offset, 1, MPI_INTEGER8, MPI_SUM, comm, ierr)
+            if (rank == 0) offset = 0_int64
+        endif
+        if (offset + local_nnz >= huge(first)) then
+            write(error_unit,*) 'CSR row pointer exceeds the 32-bit range on rank', rank
+            call MPI_Abort(comm, 1, ierr)
+        endif
+        first = int(offset) + 1
+    end function CSR_Element_Start
+
     !> @brief Convert a COO matrix to a CSR matrix.
 
-    subroutine COO_to_CSR(A, B, partition_table, MPI_communicator)
+    subroutine COO_to_CSR(A, B, partition_table, MPI_communicator, local_pointers)
 
         type(COO), intent(inout) :: A
         type(CSR), intent(inout) :: B
         integer, dimension(:), intent(in) :: partition_table
         integer, intent(in) :: MPI_communicator
 
+        logical, optional, intent(in) :: local_pointers
         integer :: lower_bound, upper_bound
 
-        integer :: rank, flock, ierr
-        integer, dimension(:), allocatable :: nnz_per_rank, nnz_per_rank_temp
+        integer :: rank, ierr
 
         integer :: i
 
         call mpi_comm_rank(MPI_communicator, rank, ierr)
-        call mpi_comm_size(MPI_communicator, flock, ierr)
 
         lower_bound = partition_table(rank + 1)
         upper_bound = partition_table(rank + 2) - 1
@@ -155,38 +178,13 @@ module Sparse
 
         B%row_starts = 0
 
-        i = 1
         do i = 1, A%nnz
             B%values(i) = A%values(i)
             B%col_indexes(i) = A%col_indexes(i)
             B%row_starts(A%row_indexes(i) + 1) = B%row_starts(A%row_indexes(i) + 1) + 1
         enddo
 
-        allocate(nnz_per_rank(flock + 1))
-        allocate(nnz_per_rank_temp(flock + 1))
-
-        nnz_per_rank_temp = 0
-
-        nnz_per_rank_temp(rank + 2) = A%nnz
-
-        if (rank == 0) then
-            nnz_per_rank_temp(1) = 1
-        endif
-
-        call mpi_allreduce( nnz_per_rank_temp, &
-                            nnz_per_rank, &
-                            flock + 1, &
-                            MPI_INTEGER, &
-                            MPI_SUM, &
-                            MPI_communicator, &
-                            ierr)
-
-        do i = 2, rank + 2
-            nnz_per_rank(i) = nnz_per_rank(i) + nnz_per_rank(i - 1)
-        enddo
-
-        B%row_starts(lower_bound) = nnz_per_rank(rank + 1)
-
+        B%row_starts(lower_bound) = CSR_Element_Start(int(A%nnz, int64), rank, MPI_communicator, local_pointers)
         call prefix_sum(B%row_starts)
 
     end subroutine COO_to_CSR
@@ -195,30 +193,40 @@ module Sparse
     !> @brief Sparse matrix gather, used in COO sum.
     !
 
-    subroutine Gather_SPA(row_spa, A, current_row)
+    subroutine Gather_SPA(row_spa, A, current_row, comm)
 
         type(SPA), intent(inout) :: row_spa
         type(COO), intent(inout) :: A
-        integer, intent(in) :: current_row
-        integer :: starting_nnz
+        integer, intent(in) :: current_row, comm
+        integer(int64) :: nnz
         integer :: i
 
-        starting_nnz = A%nnz
-
+        nnz = A%nnz
         do i = 1, row_spa%LS_ind - 1
             if (abs(row_spa%w(row_spa%LS(i))) > spa_tolerance) then
-                A%nnz = A%nnz + 1
-                !A%row_indexes(A%nnz) = current_row
-                A%col_indexes(A%nnz) = row_spa%LS(i)
-                A%values(A%nnz) = row_spa%w(row_spa%LS(i))
+                nnz = nnz + 1
+                A%col_indexes(nnz) = row_spa%LS(i)
+                A%values(nnz) = row_spa%w(row_spa%LS(i))
             endif
         enddo
 
-        A%row_indexes(starting_nnz + 1: A%nnz) = current_row
-
+        call Check_Local_Nnz(nnz, comm)
+        A%row_indexes(A%nnz + 1:nnz) = current_row
+        A%nnz = int(nnz)
         row_spa%LS_ind = 1
 
     end subroutine Gather_SPA
+
+    subroutine Check_Local_Nnz(nnz, comm)
+        integer(int64), intent(in) :: nnz
+        integer, intent(in) :: comm
+        integer :: ierr
+
+        if (nnz >= huge(0)) then
+            write(error_unit,*) 'Local sparse matrix exceeds the one-based index range:', nnz
+            call MPI_Abort(comm, 1, ierr)
+        endif
+    end subroutine Check_Local_Nnz
 
     !
     !> @brief Scatter elements of a sparse matrix, used in COO matrix sum.
@@ -253,17 +261,9 @@ module Sparse
         integer, intent(in) :: local_rows
         type(COO), intent(inout) :: C
 
-        integer(qp) :: dense_dim
+        integer(int64) :: estimated_nnz
 
-        integer :: estimated_nnz
-
-        estimated_nnz = A%nnz + B%nnz
-
-        dense_dim = int(A%columns,qp)*int(local_rows,qp)
-
-        if (estimated_nnz > dense_dim) then
-            estimated_nnz = A%columns*local_rows
-        endif
+        estimated_nnz = min(int(A%nnz, int64) + B%nnz, int(A%columns, int64)*local_rows)
 
         allocate(C%row_indexes(estimated_nnz))
         allocate(C%col_indexes(estimated_nnz))
@@ -351,7 +351,7 @@ module Sparse
                 call scatter_spa(row_spa, B%values(kb), B%col_indexes(kb), i)
                 kb = kb + 1
             enddo
-            call Gather_SPA(row_spa, C, i)
+            call Gather_SPA(row_spa, C, i, MPI_communicator)
             row_spa%LS_ind = 1
         enddo
 
@@ -362,7 +362,6 @@ module Sparse
 
     ! Add conjg(L) (x) L to B using only the rows owned by this rank.
     subroutine Add_Jump_Product(L, B, first_row, last_row, C, MPI_communicator)
-        use iso_fortran_env, only: int64, error_unit
         type(CSR), intent(in) :: L
         type(COO), intent(in) :: B
         integer, intent(in) :: first_row, last_row, MPI_communicator
@@ -370,7 +369,7 @@ module Sparse
 
         type(SPA) :: row
         integer(int64) :: local_nnz
-        integer :: pass, i, outer, inner, j, k, col, b_pos, ierr
+        integer :: pass, i, outer, inner, j, k, col, b_pos
         complex(dp) :: factor
 
         C%rows = L%rows**2
@@ -402,14 +401,11 @@ module Sparse
                     enddo
                     row%LS_ind = 1
                 else
-                    call Gather_SPA(row, C, i)
+                    call Gather_SPA(row, C, i, MPI_communicator)
                 endif
             enddo
             if (pass == 1) then
-                if (local_nnz > huge(C%nnz)) then
-                    write(error_unit,*) 'Local dissipator exceeds the COO index range:', local_nnz
-                    call MPI_Abort(MPI_communicator, 1, ierr)
-                endif
+                call Check_Local_Nnz(local_nnz, MPI_communicator)
                 allocate(C%row_indexes(local_nnz), C%col_indexes(local_nnz), C%values(local_nnz))
             endif
         enddo
@@ -512,8 +508,6 @@ module Sparse
         integer, intent(out), dimension(:), allocatable :: partition_table !< @param Start/Finish of partitions.
         integer, intent(in) :: MPI_communicator !< @param MPI communicator over which to distribute.
 
-        integer :: remainder
-
         integer :: i
 
         ! MPI environment
@@ -525,17 +519,8 @@ module Sparse
         allocate(partition_table(flock + 1))
 
         do i = 1, flock + 1
-            partition_table(i) = (i - 1)*rows/flock + 1
+            partition_table(i) = int((i - 1)*int(rows, int64)/flock) + 1
         enddo
-
-        remainder = rows - partition_table(flock + 1)
-
-        do i = 1, remainder
-            partition_table(flock - mod(i, flock):flock + 1) = &
-                partition_table(flock - mod(i, flock):flock + 1) + 1
-        enddo
-
-        partition_table(flock + 1) = rows + 1
 
     end subroutine Generate_Partition_Table
 
@@ -1153,7 +1138,7 @@ module Sparse
         if (start < finish) then
             if (finish - start >= 512) then
 
-                mid = (start + finish) / 2
+                mid = start + (finish - start) / 2
 
                 call Merge_Sort_Dagger( column_indexes, &
                                         row_indexes, &
@@ -1185,13 +1170,14 @@ module Sparse
 
     !> @brief Returns the distributed conjugate transpose of CSR matrix A.
 
-    subroutine CSR_Dagger(A, partition_table, A_T, MPI_communicator)
+    subroutine CSR_Dagger(A, partition_table, A_T, MPI_communicator, local_pointers)
 
         type(CSR), intent(in) :: A
         integer, dimension(:), intent(in) :: partition_table
         type(CSR), intent(out) :: A_T
         integer, intent(in) :: MPI_communicator
 
+        logical, optional, intent(in) :: local_pointers
         integer :: lb, ub
         integer :: element_lb_T, element_ub_T
 
@@ -1204,8 +1190,7 @@ module Sparse
         integer, dimension(:), allocatable :: send_counts, rec_counts
         integer, dimension(:), allocatable :: send_disps, rec_disps
 
-        integer, dimension(:), allocatable :: elements_per_rank
-        integer, dimension(:), allocatable :: elements_per_rank_temp
+        integer(int64) :: received_nnz
 
         integer, dimension(:), allocatable :: mapping_disps
         integer, dimension(:), allocatable :: column_indexes_out, row_indexes_out
@@ -1310,30 +1295,9 @@ module Sparse
                             MPI_communicator, &
                             ierr)
 
-        allocate(elements_per_rank_temp(flock))
-
-        elements_per_rank_temp = 0
-        elements_per_rank_temp(rank + 1) = sum(rec_counts)
-
-        allocate(elements_per_rank(flock + 1))
-
-        elements_per_rank(1) = 1
-        elements_per_rank(2:flock + 1) = 0
-
-        call mpi_allreduce( elements_per_rank_temp, &
-                            elements_per_rank(2:flock + 1), &
-                            flock, &
-                            mpi_integer, &
-                            mpi_sum, &
-                            mpi_communicator, &
-                            ierr)
-
-        do i = 2, flock + 1
-           elements_per_rank(i) = elements_per_rank(i) + elements_per_rank(i - 1)
-        enddo
-
-        element_lb_T = elements_per_rank(rank + 1)
-        element_ub_T = elements_per_rank(rank + 2) - 1
+        received_nnz = sum(int(rec_counts, int64))
+        element_lb_T = CSR_Element_Start(received_nnz, rank, MPI_communicator, local_pointers)
+        element_ub_T = element_lb_T - 1 + int(received_nnz)
 
         allocate(column_indexes_in(element_lb_T:element_ub_T))
         allocate(A_T%col_indexes(element_lb_T:element_ub_T))
@@ -1388,7 +1352,7 @@ module Sparse
 
         allocate(A_T%row_starts(lb:ub+1))
 
-        A_T%row_starts(lb) = elements_per_rank(rank + 1)
+        A_T%row_starts(lb) = element_lb_T
         A_T%row_starts(lb + 1:ub + 1) = 0
 
         do i = element_lb_T, element_ub_T
@@ -1486,6 +1450,11 @@ module Sparse
             endif
         enddo
 
+        if (int(ub, int64) + total_rec_inds > huge(ub)) then
+            write(error_unit,*) 'Halo subscripts exceed the 32-bit range on rank', rank
+            call MPI_Abort(MPI_communicator, 1, ierr)
+        endif
+
         ind = 0
         do i = 1, size(requires)
             if (requires(i) /= 0) then
@@ -1552,6 +1521,11 @@ module Sparse
                             MPI_integer, &
                             MPI_communicator, &
                             ierr)
+
+        if (sum(int(A%num_send_inds, int64)) >= huge(ind)) then
+            write(error_unit,*) 'MPI send buffer exceeds the 32-bit range on rank', rank
+            call MPI_Abort(MPI_communicator, 1, ierr)
+        endif
 
         if (.not. associated(A%RHS_send_inds)) then
             allocate(A%RHS_send_inds(sum(A%num_send_inds)))
@@ -1934,7 +1908,7 @@ module Sparse
         if (start < finish) then
             if (finish - start >= 512) then
 
-                mid = (start + finish) / 2
+                mid = start + (finish - start) / 2
 
                 call Merge_Sort_CSR( column_indexes, &
                                         values, &
