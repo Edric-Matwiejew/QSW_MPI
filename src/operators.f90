@@ -297,7 +297,7 @@ module Operators
                         diag_hit = .false.
                         endif
                      endif
-                else
+                elseif (row_start(row + 1) > row_start(row)) then
 
                     B%values(row_start(row)) = diag_vals(row)
                     B%col_indexes(row_start(row)) = row
