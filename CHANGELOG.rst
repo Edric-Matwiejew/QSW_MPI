@@ -2,6 +2,15 @@
 Changelog
 =========
 
+**********************************
+1.1.0 - 2026-11-20 Feature Release
+**********************************
+
+* Added ``walk.initial_pure_state`` to initialise a distributed density operator from amplitudes supplied by one MPI rank.
+* Parallel writes now use the native Fortran HDF5 interface. Serial output uses h5py.
+* Reduced memory use during GKSL generator assembly and deferred higher-power norm estimates until propagation needs them.
+* Replaced the separate Makefile and setuptools build steps with a single ``python -m pip install .`` using scikit-build-core and CMake. The package now requires Python 3.9 or later and NumPy 2.0 or later.
+
 **************************
 1.0.2 - 2020-09-27 Bug Fix
 **************************
