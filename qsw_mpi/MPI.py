@@ -827,7 +827,7 @@ class GKSL(walk):
 
         self.rho_set = False
 
-        super().initial_state()
+        super().initial_state(state)
 
 class GQSW(walk):
     """
