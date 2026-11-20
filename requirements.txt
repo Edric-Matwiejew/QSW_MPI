@@ -1,4 +1,4 @@
-numpy
+numpy>=2.0
 scipy
 mpi4py
 h5py

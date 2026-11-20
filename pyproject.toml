@@ -1,0 +1,23 @@
+[build-system]
+requires = ["scikit-build-core>=0.11", "numpy>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "qsw_mpi"
+version = "1.1.0"
+description = "A framework for Quantum Stochastic Walk Simulation."
+readme = "README.rst"
+requires-python = ">=3.9"
+license = "GPL-3.0-or-later"
+authors = [{name = "Edric Matwiejew", email = "edric.matwiejew@csiro.au"}]
+dependencies = ["numpy>=2.0", "scipy", "mpi4py", "h5py"]
+
+[project.optional-dependencies]
+visualisation = ["matplotlib", "networkx"]
+
+[project.urls]
+Homepage = "https://github.com/Edric-Matwiejew/QSW_MPI"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+wheel.packages = ["qsw_mpi"]

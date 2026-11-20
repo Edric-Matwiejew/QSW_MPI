@@ -1,2 +1,0 @@
-include README.rst LICENSE examples/*.py 
-recursive-include src Makefile *.f90 *.pyf .f2py_f2cmap

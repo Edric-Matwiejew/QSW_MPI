@@ -33,14 +33,12 @@ From: pawsey/mpi-base:3.1.4
     natsort \
 	h5py
 
-	git clone https://github.com/Edric-Matwiejew/QSW_MPI
-    cd QSW_MPI_dev/src
+    # This historical benchmark image uses the Python 3.6 build of QSW_MPI.
+    git clone --depth 1 --branch v1.0.0 https://github.com/Edric-Matwiejew/QSW_MPI
+    cd QSW_MPI/src
     make
-    cd ../
-    python3 setup.py sdist bdist_wheel
-	cd dist
-	pip3 install qsw_mpi*.tar.gz
-	cd
+    cd ..
+    python3 -m pip install .
 
 %labels   Edric Matwiejew
     Version v0.0.1

@@ -77,26 +77,19 @@ def _write_partitions(lib, comm, filename, packed):
 
 def _write(comm, filename, action, datasets, dimensions=None):
     filename = filename + '.h5'
-    lib = _native_io()
-    if lib is None:
-        if not h5py.get_config().mpi:
-            raise RuntimeError("Build the parallel HDF5 writer with 'make parallel_io' in QSW_MPI/src")
-        with h5py.File(filename, action, driver='mpio', comm=comm) as handle:
-            _create_datasets(handle, datasets, dimensions)
-            for name, (_, _, blocks) in datasets.items():
-                for start, array in blocks:
-                    if array.size:
-                        region = tuple(slice(i, i + n) for i, n in zip(start, array.shape))
-                        handle[name][region] = array
-        return
-
     packed = {}
     error = None
     try:
+        lib = _native_io()
+        if lib is None:
+            raise RuntimeError("Parallel output requires the native HDF5 writer. "
+                               "Install parallel HDF5 with Fortran support and run "
+                               "'python -m pip install . -Ccmake.define.QSW_PARALLEL_IO=ON' "
+                               "from the QSW_MPI checkout.")
         for name, (shape, _, blocks) in datasets.items():
             if 0 not in shape:
                 packed[name] = _pack_blocks(blocks)
-    except (MemoryError, ValueError, OverflowError) as exc:
+    except Exception as exc:
         error = exc
     if comm.allreduce(error is not None, op=MPI.LOR):
         raise next(exc for exc in comm.allgather(error) if exc is not None)

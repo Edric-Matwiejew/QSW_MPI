@@ -571,7 +571,22 @@ operators, coefficients and MPI-communicator. On doing so the
 distributed :math:`\tilde{\mathcal{L}}` is generated and its 1-norm
 series calculated [1]_. After this the user defines :math:`\rho(0)` and
 generates the distributed :math:`\tilde{\rho}(0)` via the
-:meth:`~qsw_mpi.MPI.initial_state` method.
+:meth:`~qsw_mpi.MPI.walk.initial_state` method.
+
+For a pure initial state, pass its normalized amplitudes to
+:meth:`~qsw_mpi.MPI.walk.initial_pure_state`. For example, a two-site walk
+can start in :math:`(|0\rangle + i|1\rangle)/\sqrt{2}`.
+
+.. code-block:: python
+
+    psi = np.array([1, 1j]) / np.sqrt(2) if comm.rank == 0 else None
+    walk.initial_pure_state(psi)
+
+The selected root (rank zero by default) broadcasts
+the ket, and each rank constructs its own entries of :math:`\rho(0)` directly.
+For :math:`N` basis states, initialization uses space for :math:`N` amplitudes
+plus the local partition of the density operator. A vector passed to
+``initial_state`` continues to specify diagonal populations.
 
 Simulations are carried out for a single time point with the :meth:`~qsw_mpi.MPI.walk.step`
 method or for a number of equally spaced points using the :meth:`~qsw_mpi.MPI.walk.series`
@@ -581,9 +596,9 @@ which can be reshaped and gathered to a specified MPI process via
 :meth:`~qsw_mpi.MPI.walk.gather_result`, or measured via :meth:`~qsw_mpi.MPI.walk.gather_populations`.
 By default, :meth:`~qsw_mpi.MPI.walk.save_result`,
 :meth:`~qsw_mpi.MPI.walk.save_populations` and :meth:`~qsw_mpi.MPI.walk.save_superoperator`
-gather their data on rank zero for output. With the native parallel HDF5 writer
-installed, set ``walk.parallel_io = True`` on all participating ranks to write
-their partitions directly to a shared file.
+gather their data on rank zero for serial output with h5py. Set
+``walk.parallel_io = True`` on all participating ranks to write their partitions
+directly to a shared file. Parallel output requires the native Fortran HDF5 writer.
 
 Both modes store complex values as HDF5 compound records with two
 little-endian 64-bit floating-point fields, ``r`` and ``i``. Standard

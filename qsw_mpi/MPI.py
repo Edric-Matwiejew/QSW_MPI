@@ -246,6 +246,59 @@ class walk(object):
                 self.partition_table,
                 self.MPI_communicator.py2f())
 
+    def initial_pure_state(self, amplitudes, root=0):
+        r"""
+        Set the distributed initial density operator to :math:`|\psi\rangle\langle\psi|`.
+
+        Call this method on every rank of the walk's communicator with the same
+        root. The root supplies a one-dimensional, unit-norm vector of complex
+        amplitudes in the Hamiltonian basis. Other ranks may pass ``None``.
+        For an LQSW with sources or sinks, a ket on the original graph is
+        padded with zeros. A full ket may include amplitudes on the added sites.
+
+        Each rank receives the ket and stores only its local slice of the
+        column-stacked density operator in ``rho_v``.
+        """
+        comm = self.MPI_communicator
+        if not isinstance(root, (int, np.integer)) or not 0 <= root < comm.size:
+            raise ValueError("root must be a rank in the walk's communicator")
+
+        n = self.size[0]
+        error = None
+        try:
+            ket = np.empty(n, dtype=np.complex128)
+            if self.rank == root:
+                state = np.asarray(amplitudes)
+                graph_size = n - getattr(self, 'pad', 0)
+                if state.ndim != 1 or state.size not in (graph_size, n):
+                    raise ValueError("Expected one amplitude per basis state "
+                                     "(added source and sink sites may be omitted)")
+                ket[:state.size] = state
+                ket[state.size:] = 0
+                if not np.isclose(np.linalg.norm(ket), 1.0, rtol=1e-6, atol=0):
+                    raise ValueError("Pure-state amplitudes must have unit norm")
+            local = np.empty(self.SO_local_rows, dtype=np.complex128)
+        except Exception as exc:
+            error = exc
+        if comm.allreduce(error is not None, op=MPI.LOR):
+            raise next(exc for exc in comm.allgather(error) if exc is not None)
+        comm.Bcast(ket, root=root)
+
+        column, row = divmod(int(self.partition_table[self.rank]) - 1, n)
+        written = 0
+        while written < local.size:
+            count = min(n - row, local.size - written)
+            np.multiply(ket[row:row + count], ket[column].conjugate(),
+                        out=local[written:written + count])
+            written += count
+            column += 1
+            row = 0
+
+        self.rho_v = local
+        self.rho = None
+        self.rho_set = False
+        self.local_result = None
+
     def step(self, t, precision = "dp"):
         """
         Calculate :math:`\\rho(t)`. This is done via an implementation of Algorithm 3.2 (without optional balancing or minimisation of the Frobenius norm) as detailed in:
