@@ -256,10 +256,8 @@ module One_Norms
                 exit
             endif
 
-            if (rank == MASTER) then
-                if ((est > est_old) .or. (k == 2)) then
-                    ind_best = maxloc(Y_norms, 1)
-                endif
+            if (rank == MASTER .and. k >= 2) then
+                if (est > est_old .or. k == 2) ind_best = e_i(maxloc(Y_norms, 1))
             endif
 
             if ((k >= 2) .and. (est <= est_old)) then
@@ -369,14 +367,9 @@ module One_Norms
 
             if (rank == MASTER) then
 
+                complete = .true.
                 do i = 1, t
-                    do j = 1, size(h_inds_hist)
-                        complete = .true.
-                        if (h_inds(i) == h_inds_hist(j)) then
-                            exit
-                        endif
-                        complete = .false.
-                    enddo
+                    if (h_inds(i) > 0 .and. .not. any(h_inds_hist == h_inds(i))) complete = .false.
                 enddo
 
             endif
@@ -404,10 +397,10 @@ module One_Norms
 
                     indx = 1
                     do i = 1, size(h_inds)
-                        if (any(h_inds_hist == h_inds(i))) cycle
+                        if (h_inds(i) == 0 .or. any(h_inds_hist == h_inds(i))) cycle
                         e_i(indx) = h_inds(i)
                         indx = indx + 1
-                        if (indx == t) exit
+                        if (indx > t) exit
                     enddo
 
                 endif
@@ -428,7 +421,7 @@ module One_Norms
             endif
 
             call mpi_bcast( e_i, &
-                            2, &
+                            t, &
                             mpi_integer, &
                             MASTER, &
                             mpi_communicator, &
@@ -447,6 +440,24 @@ module One_Norms
         enddo
 
     end subroutine One_Norm_Estimation
+
+    !> @brief Estimate the 1-norms of A^2 and higher powers using the distributed adjoint.
+    subroutine One_Norm_Powers(A, partition_table, norms, comm)
+        type(CSR), intent(inout) :: A
+        integer, intent(in) :: partition_table(:), comm
+        real(dp), intent(out) :: norms(2:)
+        type(CSR) :: adjoint
+        integer :: i, width
+
+        width = min(3, A%columns)
+        call CSR_Dagger(A, partition_table, adjoint, comm, local_pointers=.true.)
+        call Reconcile_Communications(adjoint, partition_table, comm)
+        do i = 2, ubound(norms, 1)
+            call One_Norm_Estimation(A, adjoint, i, width, A%columns/width, partition_table, norms(i), comm)
+        enddo
+        deallocate(adjoint%row_starts, adjoint%col_indexes, adjoint%values, adjoint%local_col_inds, &
+                   adjoint%RHS_send_inds, adjoint%num_rec_inds, adjoint%rec_disps, adjoint%num_send_inds, adjoint%send_disps)
+    end subroutine One_Norm_Powers
 
     subroutine One_Norm(A, &
                         norm, &
@@ -468,7 +479,7 @@ module One_Norms
         integer :: ierr
         integer :: MASTER = 0
 
-        call MPI_comm_rank(MPI_comm_world, rank, ierr)
+        call MPI_comm_rank(MPI_communicator, rank, ierr)
 
         lb_elements = A%row_starts(partition_table(rank + 1))
         ub_elements = A%row_starts(partition_table(rank + 2)) - 1

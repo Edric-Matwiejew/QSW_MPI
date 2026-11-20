@@ -41,7 +41,7 @@ module Expm
 
     public :: Expm_Multiply, Expm_Multiply_Series
 
-    integer, parameter :: RHV = 2, m_max = 55, p_max = 8
+    integer, parameter :: m_max = 55, p_max = 8
 
     real(qp), parameter :: tol_dp = 2.0_qp**(-53.0_qp)
 
@@ -117,48 +117,40 @@ module Expm
 
     contains
 
-    function Infinity_Norm(B, MPI_communicator)
-
-        real(dp) :: Infinity_Norm
-        complex(dp), intent(in), dimension(:) :: B
-        integer, intent(in) :: MPI_communicator
-
-        real(dp) :: inf_reduce
-
+    function Local_Infinity_Norm(B) result(norm)
+        complex(dp), intent(in) :: B(:)
+        real(dp) :: norm
         integer :: i
 
-        ! MPI ENVIRONMENT
-        integer :: ierr
-
-        if (size(B)>0) then
-            Infinity_Norm = abs(B(1))
-        else
-            Infinity_Norm = 0
-        endif
-
-        !$omp parallel do reduction(max:Infinity_Norm)
-        do i = 2, size(B)
-
-            if (abs(B(i)) > Infinity_Norm) then
-
-                Infinity_Norm = abs(B(i))
-
-            endif
-
+        norm = 0
+        !$omp parallel do reduction(max:norm)
+        do i = 1, size(B)
+            norm = max(norm, abs(B(i)))
         enddo
         !$omp end parallel do
+    end function Local_Infinity_Norm
 
-        call MPI_allreduce( Infinity_Norm, &
-                            inf_reduce, &
-                            1, &
-                            MPI_double, &
-                            MPI_max, &
-                            MPI_communicator, &
-                            ierr)
+    function Infinity_Norm(B, comm) result(norm)
+        complex(dp), intent(in) :: B(:)
+        integer, intent(in) :: comm
+        real(dp) :: local, norm
+        integer :: ierr
 
-        Infinity_Norm = inf_reduce
-
+        local = Local_Infinity_Norm(B)
+        call MPI_Allreduce(local, norm, 1, MPI_double, MPI_max, comm, ierr)
     end function Infinity_Norm
+
+    subroutine Taylor_Norms(term, partial_sum, norms, comm)
+        complex(dp), intent(in) :: term(:), partial_sum(:)
+        real(dp), intent(out) :: norms(2)
+        integer, intent(in) :: comm
+        real(dp) :: local(2)
+        integer :: ierr
+
+        local(1) = Local_Infinity_Norm(term)
+        local(2) = Local_Infinity_Norm(partial_sum)
+        call MPI_Allreduce(local, norms, 2, MPI_double, MPI_max, comm, ierr)
+    end subroutine Taylor_Norms
 
     subroutine C_m( A, &
                     t, &
@@ -181,29 +173,9 @@ module Expm
 
         real(dp), dimension(:), pointer :: theta => null()
 
-        type(CSR) :: A_T
-
         real(dp), dimension(2:p_max + 1) :: A_norms
-        integer(qp), dimension(:), allocatable :: c_array
-        real(dp), dimension(2:p_max) :: alpha_array
-
-        integer(qp):: min_c
-        integer :: itmax
-
-        integer :: num_ms_and_ps
-        integer(dp), dimension(:,:), allocatable :: ms_and_ps
-
-        integer :: p
-
-        integer :: i, j , indx
-
-        integer :: l
-
-        ! MPI ENVIRONMENT
-        integer :: rank
-        integer :: ierr
-
-        call mpi_comm_rank(mpi_communicator, rank, ierr)
+        integer(qp) :: cost, min_cost, scales
+        integer :: p, m, k
 
         if (target_precision == "sp") then
             theta => theta_sp
@@ -217,112 +189,33 @@ module Expm
             p = 0
         endif
 
-        if ((p == 0) .or. (.not. present(one_norm_series))) then
-
-            if (partition_table(rank + 2) - partition_table(rank + 1) == 1) then
-                l = 1
-            else
-                l = RHV
-            endif
-
-            itmax = A%columns/l
-
-
-            call CSR_Dagger(A, &
-                            partition_table, &
-                            A_T, &
-                            MPI_communicator, local_pointers=.true.)
-
-            call Reconcile_Communications(  A_T, &
-                                            partition_table, &
-                                            MPI_communicator)
-
-            A_norms = 0
+        if (p <= 0 .or. .not. present(one_norm_series)) then
+            call One_Norm_Powers(A, partition_table, A_norms, mpi_communicator)
             p = p_max
-            do i = 2, p_max + 1
-
-                call One_Norm_Estimation(   A, &
-                                            A_T, &
-                                            i, &
-                                            l, &
-                                            itmax, &
-                                            partition_table, &
-                                            A_norms(i), &
-                                            MPI_communicator)
-
-                if (present(one_norm_series)) then
-                    one_norm_series(i) = A_norms(i)
-                endif
-
-                A_norms(i) = A_norms(i)**(1_dp/real(i,dp))
-
-                if (i >= 3) then
-                    if((abs((A_norms(i - 1) - A_norms(i))/A_norms(i)) < 0.5)) then
-                        p = i
-                        exit
-                    endif
-                endif
-
-            enddo
-
+            if (present(one_norm_series)) then
+                one_norm_series(2:) = A_norms
+                if (present(p_in)) p_in = p
+            endif
         else
-
-            do i = 2, p + 1
-
-                A_norms(i) = one_norm_series(i)**(1_dp/real(i,dp))
-
-            enddo
-
+            A_norms(2:p+1) = one_norm_series(2:p+1)
         endif
 
-        do i = 2, p
-
-            if (A_norms(i) > A_norms(i+1)) then
-
-                alpha_array(i) = t*A_norms(i)
-
-            else
-
-                alpha_array(i) = t*A_norms(i+1)
-
-            endif
-
+        do k = 2, p + 1
+            A_norms(k) = A_norms(k)**(1.0_dp/k)
         enddo
-
-        num_ms_and_ps = 0
-        do i = 2, p
-            do j = i*(i- 1) - 1, m_max
-                num_ms_and_ps = num_ms_and_ps + 1
+        min_cost = huge(min_cost)
+        do k = 2, p
+            do m = k*(k - 1) - 1, m_max
+                scales = max(1_qp, ceiling(abs(t)*max(A_norms(k), A_norms(k + 1))/theta(m), kind=qp))
+                cost = int(m, qp)*scales
+                if (cost < min_cost) then
+                    min_cost = cost
+                    m_star = m
+                endif
             enddo
         enddo
 
-        allocate(ms_and_ps(num_ms_and_ps,2))
-
-        indx = 1
-        do i = 2, p
-
-            do j = (i*(i-1)-1), m_max
-
-                ms_and_ps(indx, 1) = int(j,dp)
-                ms_and_ps(indx,2) = int(i,dp)
-                indx = indx + 1
-
-            enddo
-
-        enddo
-
-        allocate(c_array(size(ms_and_ps, 1)))
-
-        do i = 1, size(ms_and_ps, 1)
-
-            c_array(i) = ms_and_ps(i, 1)*ceiling(alpha_array(ms_and_ps(i,2)) &
-                        /theta(ms_and_ps(i,1)), kind=qp)
-
-        enddo
-
-        min_c = minval(c_array)
-        m_star = int(ms_and_ps(minloc(c_array,1),1), kind = sp)
-        s = max(int(min_c/m_star, kind = sp), 1)
+        s = int(min_cost/m_star)
 
     end subroutine C_m
 
@@ -353,13 +246,7 @@ module Expm
 
         integer :: m
 
-        ! MPI ENVIRONMENT
-        integer :: rank
-        integer :: ierr
-
-        A_norm = 0
-
-        call mpi_comm_rank(mpi_communicator, rank, ierr)
+        logical :: norm_known
 
         if (target_precision == "sp") then
             theta => theta_sp
@@ -367,73 +254,34 @@ module Expm
             theta => theta_dp
         endif
 
-        if (present(p) .and. present(one_norm_series)) then
-
-            if (p /= 0) then
-                A_norm = one_norm_series(1)
-            endif
-
+        ! p is zero before norm estimation and -1 when only the 1-norm is known.
+        ! A positive p includes estimates through power p + 1.
+        norm_known = .false.
+        if (present(p) .and. present(one_norm_series)) norm_known = p /= 0
+        if (norm_known) then
+            A_norm = one_norm_series(1)
         else
-
-            call One_Norm(  A, &
-                            A_norm, &
-                            partition_table, &
-                            MPI_communicator)
-
+            call One_Norm(A, A_norm, partition_table, MPI_communicator)
             if (present(one_norm_series)) then
                 one_norm_series(1) = A_norm
+                if (present(p)) p = -1
             endif
-
         endif
 
-        if (t*A_norm <= &
-            (2*1*(theta(m_max)/real(m_max,dp))*(p_max + 3)*p_max)) then
-
-            m_temp_1 = ceiling(t*A_norm/theta(1), kind = dp)
-
+        A_norm = abs(t)*A_norm
+        if (A_norm <= 2*(theta(m_max)/real(m_max,dp))*(p_max + 3)*p_max) then
+            m_star = 1
+            m_temp_1 = max(1_dp, ceiling(A_norm/theta(1), kind=dp))
             do m = 2, m_max
-
-            m_temp_2 = m*ceiling(t*A_norm/theta(m), kind = dp)
-
-               if (m_temp_2 < m_temp_1) then
-
-                   m_star = m
-
-               endif
-
-               m_temp_1 = m_temp_2
-
+                m_temp_2 = m*max(1_dp, ceiling(A_norm/theta(m), kind=dp))
+                if (m_temp_2 < m_temp_1) then
+                    m_star = m
+                    m_temp_1 = m_temp_2
+                endif
             enddo
-
-            s = int(ceiling(t*A_norm/theta(m_star), kind = dp), kind = sp)
-
+            s = int(m_temp_1/m_star)
         else
-
-            if (present(one_norm_series)) then
-
-                call C_m(   A, &
-                            t, &
-                            target_precision, &
-                            partition_table, &
-                            m_star, &
-                            s, &
-                            mpi_communicator, &
-                            one_norm_series = one_norm_series, &
-                            p_in = p)
-
-            else
-
-
-                call C_m(   A, &
-                            t, &
-                            target_precision, &
-                            partition_table, &
-                            m_star, &
-                            s, &
-                            mpi_communicator)
-
-            endif
-
+            call C_m(A, t, target_precision, partition_table, m_star, s, mpi_communicator, one_norm_series, p)
         endif
 
     end subroutine  Parameters
@@ -460,12 +308,11 @@ module Expm
 
         complex(dp), dimension(:), allocatable :: B_temp_1, B_temp_2
 
-        type(CSR) :: A_temp
-
         integer :: m_star, s
 
         character(len=2) :: set_target_precision
         real(qp) :: tol
+        real(dp) :: norms(2)
         real(qp) :: c_1, c_2
 
         integer :: i, j, lb, ub
@@ -493,57 +340,12 @@ module Expm
         lb = lbound(C,1)
         ub = ubound(C,1)
 
-        allocate(B_temp_1(lb:ub))
-        allocate(B_temp_2(lb:ub))
-
-        if (abs(t) < epsilon(t)) then
-            m_star = 0
-            s = 1
-        else
-
-            if (present(one_norm_series) .and. present(p)) then
-
-                call Parameters(A, &
-                                t, &
-                                set_target_precision, &
-                                partition_table, &
-                                m_star, &
-                                s, &
-                                mpi_communicator, &
-                                one_norm_series = one_norm_series, &
-                                p = p)
-
-            else
-
-            call Parameters(A, &
-                            t, &
-                            set_target_precision, &
-                            partition_table, &
-                            m_star, &
-                            s, &
-                            mpi_communicator)
-
-            endif
-
+        if (t == 0.0_dp) then
+            C = B
+            return
         endif
-
-        A_temp%rows = A%rows
-        A_temp%columns = A%columns
-        A_temp%row_starts => A%row_starts
-        A_temp%local_col_inds => A%local_col_inds
-        A_temp%RHS_send_inds => A%RHS_send_inds
-        A_temp%num_send_inds => A%num_send_inds
-        A_temp%send_disps => A%send_disps
-        A_temp%num_rec_inds => A%num_rec_inds
-        A_temp%rec_disps => A%rec_disps
-
-        allocate(A_temp%values(A%row_starts(partition_table(rank + 1)): &
-            A%row_starts(partition_table(rank + 2)) - 1))
-
-        do i = A%row_starts(lbound(A%row_starts, 1)), &
-                A%row_starts(ubound(A%row_starts, 1)) - 1
-            A_temp%values(i) = t*A%values(i)
-        enddo
+        call Parameters(A, t, set_target_precision, partition_table, m_star, s, mpi_communicator, one_norm_series, p)
+        allocate(B_temp_1(lb:ub), B_temp_2(lb:ub))
 
         B_temp_1(lb:ub) = B(lb:ub)
         C(lb:ub) = B(lb:ub)
@@ -554,7 +356,7 @@ module Expm
 
             do j = 1, m_star
 
-                call SpMV_Series(   A_temp, &
+                call SpMV_Series(   A, &
                                     B_temp_1, &
                                     partition_table, &
                                     1, &
@@ -564,14 +366,13 @@ module Expm
                                     B_temp_2, &
                                     mpi_communicator)
 
-                B_temp_2(lb:ub) = B_temp_2(lb:ub)/real(s*j, dp)
-
-                c_2 = Infinity_Norm(B_temp_2, MPI_communicator)
+                B_temp_2(lb:ub) = (t/real(s, dp)/real(j, dp))*B_temp_2(lb:ub)
 
                 C(lb:ub) = C(lb:ub) + B_temp_2(lb:ub)
 
-                if ((c_1 + c_2) <= &
-                    (tol*Infinity_Norm(C, MPI_communicator))) then
+                call Taylor_Norms(B_temp_2, C, norms, MPI_communicator)
+                c_2 = norms(1)
+                if (c_1 + c_2 <= tol*norms(2)) then
                     exit
                 endif
 
@@ -586,7 +387,7 @@ module Expm
         enddo
 
         ! Final call to deallocate saved arrays.
-        call SpMV_Series(   A_temp, &
+        call SpMV_Series(   A, &
                             B_temp_1, &
                             partition_table, &
                             0, &
@@ -595,8 +396,6 @@ module Expm
                             rank, &
                             B_temp_2, &
                             mpi_communicator)
-
-        deallocate(A_temp%values)
 
     end subroutine Expm_Multiply
 
@@ -619,12 +418,14 @@ module Expm
         integer, dimension(:), intent(in) :: partition_table
         complex(dp), dimension(:,:), intent(out) :: X
         integer, intent(in) :: mpi_communicator
-        real(dp), dimension(p_max + 1), optional, intent(inout) :: one_norm_series_in
-        integer, optional, intent(inout) :: p_ex
+        real(dp), dimension(p_max + 1), optional, target, intent(inout) :: one_norm_series_in
+        integer, optional, target, intent(inout) :: p_ex
         character(len=2), optional, intent(in) :: target_precision
 
-        real(dp), dimension(p_max + 1) :: one_norm_series
-        integer :: p_in
+        real(dp), target :: local_norms(p_max + 1)
+        integer, target :: local_p
+        real(dp), pointer :: one_norm_series(:)
+        integer, pointer :: p_in
 
         integer :: q
 
@@ -634,6 +435,7 @@ module Expm
 
         character(len=2) :: set_target_precision
         real(qp) :: tol
+        real(dp) :: norms(2)
         real(qp) :: c_1, c_2
 
         integer :: m_star, s, m_hat
@@ -670,10 +472,12 @@ module Expm
         allocate(F(ub - lb + 1))
 
         if (present(one_norm_series_in) .and. present(p_ex)) then
-            one_norm_series = one_norm_series_in
-            p_in = p_ex
+            one_norm_series => one_norm_series_in
+            p_in => p_ex
         else
-            p_in =0
+            local_p = 0
+            p_in => local_p
+            one_norm_series => local_norms
         endif
 
         call Expm_Multiply( A, &
@@ -721,21 +525,12 @@ module Expm
 
         endif
 
-        d = floor(real(q)/real(s))
-        j = floor(real(q)/real(d))
+        d = q/s
+        j = q/d
         r = q - d*j
         d_tilde = d
 
-        call C_m(   A, &
-                    real(d, dp), &
-                    set_target_precision, &
-                    partition_table, &
-                    m_star, &
-                    s, &
-                    mpi_communicator, &
-                    one_norm_series = one_norm_series, &
-                    p_in = p_in)
-
+        ! The time span of each block is at most abs(tq - t0)/s.
         Z = X(:, 1)
 
         allocate(K(ub - lb + 1, m_star + 1))
@@ -779,13 +574,12 @@ module Expm
 
                     F = F + (real(kay,dp)**real(p, dp))*K(:,p+1)
 
-                    c_2 = (real(kay,qp)**real(p, dp)) &
-                            *Infinity_Norm(K(:,p + 1), MPI_communicator)
+                    call Taylor_Norms(K(:,p + 1), F, norms, MPI_communicator)
+                    c_2 = (real(kay,qp)**real(p, dp))*norms(1)
 
                     indx = p
 
-                    if ((c_1 + c_2) <= &
-                        (tol*Infinity_Norm(F, MPI_communicator))) then
+                    if (c_1 + c_2 <= tol*norms(2)) then
 
                         exit
 
@@ -806,6 +600,8 @@ module Expm
             endif
 
         enddo
+
+        call SpMV_Series(A, Z, partition_table, 0, 0, 0, rank, F, mpi_communicator)
 
     end subroutine Expm_Multiply_Series
 

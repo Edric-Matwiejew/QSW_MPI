@@ -29,7 +29,10 @@ _MPI_COUNT_MAX = int(np.iinfo(np.int32).max)
 
 
 def _nnz_offsets(comm, local_nnz):
-    """Zero-based global offsets, including the end of the last rank's slice."""
+    """
+    Returns the zero-based offset of each rank's nonzero entries.
+    The final offset is the total number of stored entries.
+    """
     counts = np.empty(comm.size, dtype=np.int64)
     comm.Allgather(np.int64(local_nnz), counts)
     if np.any(counts < 0):
@@ -41,11 +44,14 @@ def _nnz_offsets(comm, local_nnz):
 
 
 def _gather_csr_array(comm, local, offsets, output, root):
-    """Gather contiguous slices using displacements representable by MPI-3."""
+    """
+    Gathers a distributed CSR array to the root MPI process in blocks
+    with 32-bit counts and displacements.
+    """
     total = int(offsets[-1])
     for start in range(0, total, _MPI_COUNT_MAX):
         end = min(start + _MPI_COUNT_MAX, total)
-        # Intersect each rank's slice with this window into the receive buffer.
+        # MPI displacements are relative to the start of the current block.
         cuts = np.clip(offsets, start, end) - start
         counts = np.diff(cuts).astype(np.int32)
         local_start = max(0, start - int(offsets[comm.rank]))
@@ -92,6 +98,10 @@ class walk(object):
 
         super().__init__()
 
+    By default, :meth:`step` and :meth:`series` use a blocking all-to-all
+    exchange. Set ``overlap_communication`` to ``True`` on all MPI ranks to
+    overlap the neighbour exchange with local matrix-vector multiplication.
+
     The following :class:`walk` sub-classes are defined in QSW_MPI:
 
     * :class:`LQSW`: QSWs with locally interacting Lindbad operators.
@@ -102,6 +112,7 @@ class walk(object):
     def __init__(self):
 
         self.parallel_io = False
+        self.overlap_communication = False
         self.local_result = None
         self._reconcile_mpi_communications()
         self._superoperator_one_norms()
@@ -133,34 +144,29 @@ class walk(object):
         self.rec_time = time()
         self._kernel_row_starts = getattr(self, '_local_row_starts', self.SO_row_starts)
 
-        self.SO_num_rec_inds, self.SO_rec_disps, self.SO_num_send_inds, self.SO_send_disps = fMPI.rec_a(
-                self.SO_rows,
-                self._kernel_row_starts,
-                self.SO_col_indexes,
-                self.partition_table,
-                self.MPI_communicator.py2f())
+        def receive_send_indices(indices):
+            try:
+                self.SO_rhs_send_inds = indices.copy()
+            except MemoryError:
+                self.SO_rhs_send_inds = None
 
-        self.SO_local_col_inds, self.SO_rhs_send_inds = fMPI.rec_b(
-                self.SO_rows,
-                np.sum(self.SO_num_send_inds),
-                self._kernel_row_starts,
-                self.SO_col_indexes,
-                self.SO_num_rec_inds,
-                self.SO_rec_disps,
-                self.SO_num_send_inds,
-                self.SO_send_disps,
-                self.partition_table,
-                self.MPI_communicator.py2f())
+        (self.SO_local_col_inds, self.SO_num_rec_inds, self.SO_rec_disps,
+         self.SO_num_send_inds, self.SO_send_disps) = fMPI.build_communications(
+                self.SO_col_indexes, self.partition_table,
+                self.MPI_communicator.py2f(), receive_send_indices)
 
+        if self.MPI_communicator.allreduce(self.SO_rhs_send_inds is None, op=MPI.LOR):
+            raise MemoryError("A rank could not copy its MPI send indices")
         self.rec_time = time() - self.rec_time
 
     def _superoperator_one_norms(self):
         """
-        Calculates :math:`[\\tilde{\mathcal{L}}^1,...,\\tilde{\mathcal{L}}^9]`, which is used to determine optimal scaling and squaring parameters when calling :meth:`qsw_mpi.MPI.walk.step` and :meth:`qsw_mpi.MPI.walk.series`.
+        Calculates the 1-norm of the superoperator. :meth:`step` and
+        :meth:`series` estimate the norms of higher powers when required.
         """
         self.one_norms_time = time()
 
-        self.one_norms, self.p = fMPI.one_norm_series(
+        self.one_norms, p = fMPI.one_norm_series(
                 self.SO_rows,
                 self._kernel_row_starts,
                 self.SO_col_indexes,
@@ -172,13 +178,15 @@ class walk(object):
                 self.SO_local_col_inds,
                 self.SO_rhs_send_inds,
                 self.partition_table,
-                self.MPI_communicator.py2f())
+                self.MPI_communicator.py2f(), first_only=1)
+        self.p = np.array(p, dtype=np.int32)
 
         self.one_norms_time = time() - self.one_norms_time
 
     def set_omega(self, omega):
         """
-        Re-defines :math:`\omega` in the QSW  master equation. This requires that :math:`\\tilde{\mathcal{L}}` be re-built, its communication pattern re-optimised and its one-norm series re-calculated.
+        Re-defines :math:`\omega` in the QSW master equation. Rebuilds the
+        superoperator and its communication pattern and recalculates its 1-norm.
 
         :param omega: Interpolation parameter, :math:`\omega`
         :type omega: float
@@ -278,7 +286,7 @@ class walk(object):
                 self.p,
                 self.one_norms,
                 self.MPI_communicator.py2f(),
-                precision)
+                precision, overlap=self.overlap_communication)
 
         self.step_time = time() - self.step_time
 
@@ -330,7 +338,7 @@ class walk(object):
                 self.p,
                 self.one_norms,
                 self.MPI_communicator.py2f(),
-                precision)
+                precision, overlap=self.overlap_communication)
 
         self.series_time = time() - self.series_time
 
@@ -448,7 +456,8 @@ class walk(object):
         comm = self.MPI_communicator
         offsets = _nnz_offsets(comm, len(self.SO_values))
         row_offsets = self.partition_table.astype(np.int64) - 1
-        row_offsets[-1] += 1  # Only the last rank sends the final CSR pointer.
+        # Include the final row pointer from the last rank.
+        row_offsets[-1] += 1
         row_count = row_offsets[self.rank + 1] - row_offsets[self.rank]
         values = columns = pointers = None
         allocation_ok = True
@@ -746,10 +755,11 @@ class GKSL(walk):
     """
     :class:`~qsw_mpi.MPI.GKSL` provides for the simulation of systems obeying the GKSL master equation in its diagonalised form (see Equation :eq:`eq:gksl`).
 
-    Each rank assembles its slice once. Global one-based CSR row pointers
-    (SO_row_starts) use int64. Local pointers, column indices and MPI kernel
-    counts use int32. Global rows and local nonzero counts, including the
-    adjoint used for norm estimation, must fit with their one-based sentinel.
+    ``SO_row_starts`` contains one-based, 64-bit global row pointers.
+    Local row pointers, column indices and MPI counts are 32-bit. To allow
+    for the final row pointer, the global row count and the number of stored
+    entries per rank must each be less than :math:`2^{31}-1`. These limits
+    also apply to the adjoint used in norm estimation.
 
     :param H: Hamiltonian, :math:`H`.
     :type H: :math:`N \\times N` complex SciPy CSR
@@ -820,7 +830,7 @@ class GKSL(walk):
                 self.L_nnz.append(self.Ls[i].nnz)
 
         def receive_csr(ptr, cols, vals):
-            # The native arrays are released immediately after the callback.
+            # Copy the CSR arrays before the Fortran routine deallocates them.
             try:
                 self._local_row_starts = ptr.copy() if ptr.size > 1 else np.repeat(ptr, 2)
                 self.SO_row_starts = self._local_row_starts.astype(np.int64)
@@ -925,8 +935,8 @@ class GQSW(walk):
             self.H_loc_indices = H_loc.indices
             self.H_loc_data = H_loc.data
         else:
-            self.H_loc_indptr = np.zeros(H.shape[0] + 1, dtype = np.int)
-            self.H_loc_indices = np.zeros(1, dtype = np.int)
+            self.H_loc_indptr = np.zeros(H.shape[0] + 1, dtype = np.int32)
+            self.H_loc_indices = np.zeros(1, dtype = np.int32)
             self.H_loc_data = np.zeros(1, dtype = np.complex128)
 
         self.vsets = vsets

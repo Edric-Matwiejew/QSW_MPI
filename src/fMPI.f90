@@ -146,7 +146,7 @@ subroutine Generalized_Super_Operator_Extent(   taus, &
 
 end subroutine Generalized_Super_Operator_Extent
 
-! Compatibility with callers which request only the extent.
+! Discard the local CSR arrays when only the superoperator extent is requested.
 subroutine discard_gksl_slice(nptr, nnz, ptr, cols, vals)
     use :: iso_precisions
     implicit none
@@ -750,6 +750,28 @@ subroutine  Super_Operator( omega, &
 
 end subroutine Super_Operator
 
+subroutine build_communications(nnz, cols, flock, partition_table, comm, receive_send_indices, &
+                                local_cols, rec_counts, rec_disps, send_counts, send_disps)
+    use :: Sparse
+    implicit none
+    integer, intent(in) :: nnz, flock, comm, partition_table(flock + 1)
+    integer, target, intent(in) :: cols(nnz)
+    integer, target, intent(out) :: local_cols(nnz), rec_counts(flock), rec_disps(flock)
+    integer, target, intent(out) :: send_counts(flock), send_disps(flock)
+    external receive_send_indices
+    type(CSR) :: M
+
+    M%col_indexes => cols
+    M%local_col_inds => local_cols
+    M%num_rec_inds => rec_counts
+    M%rec_disps => rec_disps
+    M%num_send_inds => send_counts
+    M%send_disps => send_disps
+    call Reconcile_Communications(M, partition_table, comm)
+    call receive_send_indices(size(M%RHS_send_inds), M%RHS_send_inds)
+    deallocate(M%RHS_send_inds)
+end subroutine build_communications
+
 subroutine rec_a(   M_rows, &
                     M_n_row_starts, &
                     M_n_col_indexes, &
@@ -807,6 +829,8 @@ subroutine rec_a(   M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
 
         call Reconcile_Communications(M, partition_table, MPI_communicator)
+
+        deallocate(M%local_col_inds, M%RHS_send_inds)
 
 end subroutine rec_a
 
@@ -897,7 +921,7 @@ subroutine one_norm_series( M_rows, &
                             partition_table, &
                             MPI_communicator, &
                             one_norm_array, &
-                            p)
+                            p, first_only)
 
         use :: iso_precisions
         use :: Sparse
@@ -926,24 +950,11 @@ subroutine one_norm_series( M_rows, &
         integer, dimension(flock + 1), intent(in) :: partition_table
         integer, intent(in) :: MPI_communicator
         real(dp), dimension(9), intent(out) :: one_norm_array
+        integer, intent(in) :: first_only
         integer, intent(out) :: p
 
         type(CSR) :: M
-        type(CSR) :: M_T
-
-        integer :: itmax
-
-        integer :: i
-
-        integer :: rank, ierr
-
-        integer :: lb, ub
-        integer :: lb_elements, ub_elements
-
-        integer, parameter :: l = 3
-        integer, parameter :: pmax = 8
-
-        real(dp), dimension(9) :: alphas
+        integer :: rank, ierr, lb, ub, lb_elements, ub_elements
 
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
@@ -966,42 +977,13 @@ subroutine one_norm_series( M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
         M%RHS_send_inds(1:size(M_RHS_send_inds)) => M_RHS_send_inds
 
-        call CSR_Dagger(M, partition_table, M_T, MPI_communicator, local_pointers=.true.)
-
-        call Reconcile_Communications(  M_T, &
-                                        partition_table, &
-                                        MPI_communicator)
-
-        itmax = M%columns/l
-
         one_norm_array = 0
-
-        call One_Norm(  M, &
-                        one_norm_array(1), &
-                        partition_table, &
-                        MPI_communicator)
-
-        one_norm_array(1) = one_norm_array(1)
-
-        p = pmax
-
-        do i = 2, pmax + 1
-
-            call One_Norm_Estimation(   M, &
-                                        M_T, &
-                                        i, &
-                                        l, &
-                                        itmax, &
-                                        partition_table, &
-                                        one_norm_array(i), &
-                                        mpi_communicator)
-
-            alphas(i) = one_norm_array(i)**(1_dp/real(i,8))
-
-        enddo
-
-        deallocate(M_T%values, M_T%row_starts, M_T%local_col_inds, M_T%col_indexes, &
-            M_T%num_rec_inds, M_T%rec_disps, M_T%num_send_inds, M_T%send_disps, M_T%RHS_send_inds)
+        call One_Norm(M, one_norm_array(1), partition_table, MPI_communicator)
+        p = -1
+        if (first_only == 0) then
+            call One_Norm_Powers(M, partition_table, one_norm_array(2:), MPI_communicator)
+            p = size(one_norm_array) - 1
+        endif
 
 end subroutine one_norm_series
 
@@ -1067,7 +1049,7 @@ subroutine step(M_rows, &
                 MPI_communicator, &
                 rhot_v, &
                 target_precision, &
-                M_n_row_starts)
+                M_n_row_starts, overlap)
 
         use :: iso_precisions
         use :: Sparse
@@ -1075,6 +1057,7 @@ subroutine step(M_rows, &
 
         implicit none
 
+        logical, intent(in) :: overlap
         integer, intent(in) :: M_rows
         integer, intent(in) :: M_n_row_starts
         integer, intent(in) :: M_n_col_indexes
@@ -1109,8 +1092,6 @@ subroutine step(M_rows, &
         integer :: lb, ub
         integer :: lb_elements, ub_elements
 
-        real(dp) :: start, finish
-
         call mpi_comm_rank(mpi_communicator, rank, ierr)
 
         lb = partition_table(rank + 1)
@@ -1133,7 +1114,7 @@ subroutine step(M_rows, &
         M%RHS_send_inds(1:size(M_RHS_send_inds)) => M_RHS_send_inds
 
 
-        start = MPI_wtime()
+        if (overlap) call Prepare_Neighbour_Exchange(M, lb, ub, MPI_communicator)
         call Expm_Multiply( M, &
                             rho0_v, &
                             t, &
@@ -1143,7 +1124,7 @@ subroutine step(M_rows, &
                             one_norm_series = one_norm_array, &
                             p = p, &
                             target_precision = target_precision)
-        finish = MPI_wtime()
+        if (overlap) call MPI_Comm_free(M%halo_comm, ierr)
 
 end subroutine step
 
@@ -1221,7 +1202,7 @@ subroutine series(  M_rows, &
                     one_norm_array, &
                     MPI_communicator, &
                     rhot_v_series, &
-                    target_precision)
+                    target_precision, overlap)
 
         use :: iso_precisions
         use :: Sparse
@@ -1229,6 +1210,7 @@ subroutine series(  M_rows, &
 
         implicit none
 
+        logical, intent(in) :: overlap
         integer, intent(in) :: M_rows
         integer, intent(in) :: M_n_row_starts
         integer, intent(in) :: M_n_col_indexes
@@ -1287,6 +1269,7 @@ subroutine series(  M_rows, &
         M%send_disps(1:size(M_send_disps)) => M_send_disps
         M%RHS_send_inds(1:size(M_RHS_send_inds)) => M_RHS_send_inds
 
+        if (overlap) call Prepare_Neighbour_Exchange(M, lb, ub, MPI_communicator)
         call Expm_Multiply_Series(  M, &
                                     rho0_v, &
                                     t_1, &
@@ -1298,6 +1281,7 @@ subroutine series(  M_rows, &
                                     one_norm_series_in = one_norm_array, &
                                     p_ex = p, &
                                     target_precision = target_precision)
+        if (overlap) call MPI_Comm_free(M%halo_comm, ierr)
 
 end subroutine series
 

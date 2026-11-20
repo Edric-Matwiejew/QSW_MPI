@@ -1445,33 +1445,20 @@ module Operators
         type(COO), intent(inout) :: LSO !> @param COO matrix
         integer, intent(in) :: MPI_communicator !> @param MPI communicator of which to generate LSO.
 
-        integer :: lower_bound, upper_bound
-        integer :: lower_block, upper_block
-        integer :: lower_offset, upper_offset
-        integer :: local_rows
-
-        integer :: indx
-
-        integer :: i, j, k, ii, ll
+        type :: gram_row
+            integer, allocatable :: cols(:)
+            complex(dp), allocatable :: values(:)
+        end type
+        type(gram_row), allocatable :: gram(:)
+        integer :: lower_bound, upper_bound, local_rows
+        integer :: i, j, k, ii, ll, inner, outer, row, col, first, last, n
+        integer, allocatable :: cols(:)
+        complex(dp), allocatable :: work(:)
+        integer(int64) :: left_nnz, right_nnz
 
         type(CSR), pointer :: L
-
-        !LSO2
-        type(COO) :: LSO2_elements
-        type(COO) :: LSO2
         type(CSR) :: L_T
-        integer :: lb_indx, ub_indx, first, last
-        integer(int64) :: term_nnz
-        integer :: offset
-        integer :: col_index, row_index
-        complex(dp) :: value
-
-        !LSO3
-        type(COO) :: LSO3_elements
-        type(COO) :: LSO3
-        integer :: row_indx
-        integer :: cnt
-
+        type(COO) :: LSO2, LSO3
         type(COO) :: LSO_temp_1, LSO_temp_2, LSO_temp_3
 
         ! MPI
@@ -1483,164 +1470,75 @@ module Operators
         lower_bound = partition_table(rank + 1)
         upper_bound = partition_table(rank + 2) - 1
 
-        lower_block = (lower_bound - 1)/Ls(1)%rows + 1
-        upper_block = int((int(upper_bound, int64) + Ls(1)%rows - 1)/Ls(1)%rows)
-
-        lower_offset = (lower_bound - (lower_block - 1)*Ls(1)%rows) - 1
-        upper_offset = (upper_bound - (upper_block - 1)*Ls(1)%rows) - Ls(1)%rows
-
         local_rows = upper_bound - lower_bound + 1
 
-        do ii = 1, size(Ls, 1)
+        do ii = 1, size(Ls)
             L => Ls(ii)
             call CSR_Transpose(L, L_T)
 
-            allocate(LSO2_elements%row_indexes(L%rows**2))
-            allocate(LSO2_elements%col_indexes(L%rows**2))
-            allocate(LSO2_elements%values(L%rows**2))
-
-            lb_indx = 0
-            ub_indx = 0
-
-            do i = 1, L%rows
-                do j = 1, L%rows
-                    value = 0
-                    do k = L_T%row_starts(i), L_T%row_starts(i + 1) - 1
-                        do ll = L_T%row_starts(j), L_T%row_starts(j + 1) - 1
-                            if(L_T%col_indexes(ll) == L_T%col_indexes(k)) then
-                                value = value + conjg(L_T%values(k))*L_T%values(ll)
-                            endif
-                            if(L_T%col_indexes(ll) > L_T%col_indexes(k)) exit
-                        enddo
+            ! Form L^dagger L for the two terms of the anticommutator.
+            allocate(gram(L%columns), cols(L%columns), work(L%columns))
+            work = 0
+            do i = 1, L%columns
+                first = L%columns + 1
+                last = 0
+                do k = L_T%row_starts(i), L_T%row_starts(i + 1) - 1
+                    row = L_T%col_indexes(k)
+                    do ll = L%row_starts(row), L%row_starts(row + 1) - 1
+                        col = L%col_indexes(ll)
+                        work(col) = work(col) + conjg(L_T%values(k))*L%values(ll)
+                        first = min(col, first)
+                        last = max(col, last)
                     enddo
-                    if (abs(value) > epsilon(real(value))) then
-                            LSO2_elements%nnz = LSO2_elements%nnz + 1
-                            LSO2_elements%row_indexes(LSO2_elements%nnz) = i
-                            LSO2_elements%col_indexes(LSO2_elements%nnz)  = j
-                            LSO2_elements%values(LSO2_elements%nnz) = value
-                        ! The first local row of L^dagger L may be empty.
-                        if((i >= 1 + lower_offset) &
-                            .and. (lb_indx == 0)) then
-                            lb_indx = LSO2_elements%nnz
-                        endif
-                    endif
-
-                    if(((L%rows + upper_offset) == i) &
-                            .and. (L%rows == j)) then
-                        ub_indx = LSO2_elements%nnz
+                enddo
+                n = 0
+                do j = first, last
+                    if (abs(work(j)) > epsilon(1.0_dp)) then
+                        n = n + 1
+                        cols(n) = j
                     endif
                 enddo
+                gram(i)%cols = cols(:n)
+                gram(i)%values = work(cols(:n))
+                if (first <= last) work(first:last) = 0
             enddo
+            deallocate(L_T%row_starts, L_T%col_indexes, L_T%values, cols, work)
 
-        if (lb_indx == 0) then
-            lb_indx = LSO2_elements%nnz + 1
-        endif
-
-        term_nnz = 0
-        do i = lower_block, upper_block
-            first = merge(lb_indx, 1, i == lower_block)
-            last = merge(ub_indx, LSO2_elements%nnz, i == upper_block)
-            term_nnz = term_nnz + max(0, last - first + 1)
-        enddo
-        call Check_Local_Nnz(term_nnz, MPI_communicator)
-        allocate(LSO2%row_indexes(term_nnz), LSO2%col_indexes(term_nnz), LSO2%values(term_nnz))
-
-        indx = 1
-        do i = lower_block, upper_block
-            if (i == lower_block) then
-                offset = lb_indx
-            else
-                offset = 1
-            endif
-            do j = offset, merge(ub_indx, LSO2_elements%nnz, i == upper_block)
-                row_index = (i-1)*L%rows + LSO2_elements%row_indexes(j)
-                col_index = (i-1)*L%columns + LSO2_elements%col_indexes(j)
-
-                LSO2%nnz = LSO2%nnz + 1
-
-                LSO2%row_indexes(LSO2%nnz) = row_index
-                LSO2%col_indexes(LSO2%nnz) = col_index
-                LSO2%values(LSO2%nnz) = -0.5d0 * LSO2_elements%values(j)
+            left_nnz = 0
+            right_nnz = 0
+            do row = lower_bound, upper_bound
+                outer = (row - 1)/L%rows + 1
+                inner = mod(row - 1, L%rows) + 1
+                left_nnz = left_nnz + size(gram(inner)%cols)
+                right_nnz = right_nnz + size(gram(outer)%cols)
             enddo
-        enddo
-
+            call Check_Local_Nnz(left_nnz, MPI_communicator)
+            call Check_Local_Nnz(right_nnz, MPI_communicator)
+            allocate(LSO2%row_indexes(left_nnz), LSO2%col_indexes(left_nnz), LSO2%values(left_nnz))
+            do row = lower_bound, upper_bound
+                inner = mod(row - 1, L%rows) + 1
+                do k = 1, size(gram(inner)%cols)
+                    LSO2%nnz = LSO2%nnz + 1
+                    LSO2%row_indexes(LSO2%nnz) = row
+                    LSO2%col_indexes(LSO2%nnz) = (row - inner) + gram(inner)%cols(k)
+                    LSO2%values(LSO2%nnz) = -0.5_dp*gram(inner)%values(k)
+                enddo
+            enddo
             call Add_Jump_Product(L, LSO2, lower_bound, upper_bound, LSO_temp_1, MPI_communicator)
-
             call COO_Deallocate(LSO2)
-            call COO_Deallocate(LSO2_elements)
 
-
-            allocate(LSO3_elements%row_indexes(L%rows**2))
-            allocate(LSO3_elements%col_indexes(L%rows**2))
-            allocate(LSO3_elements%values(L%rows**2))
-
-            term_nnz = 0
-            do i = lower_block, upper_block
-                first = 1 + merge(lower_offset, 0, i == lower_block)
-                last = L%rows + merge(upper_offset, 0, i == upper_block)
-                if (last < first) cycle
-                do j = 1, L%rows
-                    value = 0
-                    do k = L_T%row_starts(i), L_T%row_starts(i + 1) - 1
-                        do ll = L_T%row_starts(j), L_T%row_starts(j + 1) - 1
-                            if(L_T%col_indexes(ll) == L_T%col_indexes(k)) then
-                                value = value + L_T%values(k)*conjg(L_T%values(ll))
-                            endif
-                            if(L_T%col_indexes(ll) > L_T%col_indexes(k)) exit
-                        enddo
-                    enddo
-                    if (abs(value) > epsilon(real(value))) then
-                        term_nnz = term_nnz + (last - first + 1)
-                        LSO3_elements%nnz = LSO3_elements%nnz + 1
-                        LSO3_elements%row_indexes(LSO3_elements%nnz) = i
-                        LSO3_elements%col_indexes(LSO3_elements%nnz) = j
-                        LSO3_elements%values(LSO3_elements%nnz) = value
-                    endif
-                enddo
-            enddo
-
-            deallocate(L_T%row_starts, L_T%col_indexes, L_T%values)
-
-            call Check_Local_Nnz(term_nnz, MPI_communicator)
-            allocate(LSO3%row_indexes(term_nnz), LSO3%col_indexes(term_nnz), LSO3%values(term_nnz))
-
-            indx = 1
-            do i = lower_block, upper_block
-                cnt = 0
-                row_indx = indx
-                do while(indx <= LSO3_elements%nnz)
-                    if (LSO3_elements%row_indexes(indx) /= i) exit
-                    row_index = (LSO3_elements%row_indexes(indx) - 1) * L%rows + 1 + lower_offset * &
-                        Kronecker_Delta(i, lower_block)
-                    col_index = (LSO3_elements%col_indexes(indx) - 1) * L%columns + 1 + lower_offset * &
-                        Kronecker_Delta(i, lower_block)
-                    value = -0.5d0 * LSO3_elements%values(indx)
+            allocate(LSO3%row_indexes(right_nnz), LSO3%col_indexes(right_nnz), LSO3%values(right_nnz))
+            do row = lower_bound, upper_bound
+                outer = (row - 1)/L%rows + 1
+                inner = mod(row - 1, L%rows) + 1
+                do k = 1, size(gram(outer)%cols)
                     LSO3%nnz = LSO3%nnz + 1
-                    LSO3%row_indexes(LSO3%nnz) = row_index
-                    LSO3%col_indexes(LSO3%nnz) = col_index
-                    LSO3%values(LSO3%nnz) = value
-                    cnt = cnt + 1
-                    indx = indx + 1
+                    LSO3%row_indexes(LSO3%nnz) = row
+                    LSO3%col_indexes(LSO3%nnz) = (gram(outer)%cols(k) - 1)*L%rows + inner
+                    LSO3%values(LSO3%nnz) = -0.5_dp*conjg(gram(outer)%values(k))
                 enddo
-                if (cnt /= 0) then
-                    do j = 2 + Kronecker_Delta(i, lower_block)*lower_offset, L%rows &
-                        + Kronecker_Delta(i, upper_block)*upper_offset
-                    indx = row_indx
-                    row_index = (LSO3_elements%row_indexes(indx) - 1) * L%rows + j
-                        do k = 1, cnt
-                            col_index = (LSO3_elements%col_indexes(indx) - 1) * L%columns + j
-                            value = -0.5d0 * LSO3_elements%values(indx)
-                            LSO3%nnz = LSO3%nnz + 1
-                            LSO3%row_indexes(LSO3%nnz) = row_index
-                            LSO3%col_indexes(LSO3%nnz) = col_index
-                            LSO3%values(LSO3%nnz) = value
-                            indx = indx + 1
-                        enddo
-                    enddo
-                endif
             enddo
-
-            call COO_Deallocate(LSO3_elements)
+            deallocate(gram)
 
             call COO_Allocate_Sum(LSO_temp_1, LSO3, local_rows, LSO_temp_2)
             call COO_Sum(LSO_temp_1, LSO3, LSO_temp_2, partition_table, MPI_communicator)
