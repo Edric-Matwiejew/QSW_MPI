@@ -20,4 +20,4 @@ Homepage = "https://github.com/Edric-Matwiejew/QSW_MPI"
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
-wheel.packages = ["qsw_mpi"]
+wheel.packages = ["src/qsw_mpi"]
