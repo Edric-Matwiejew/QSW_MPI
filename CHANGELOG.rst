@@ -9,7 +9,7 @@ Unreleased
 * Fixed an out-of-bounds write when the LQSW solver constructs an operator with an empty row.
 * Moved the Python package to ``src/qsw_mpi/`` and the Fortran sources to ``native/``.
 * Removed the legacy benchmark scripts and the unused ``qsw_mpi.test`` script.
-* Updated the Read the Docs build configuration. Documented the parallel HDF5 save functions and corrected the description of ``GKSL.set_omega``.
+* Configured GitHub Pages to publish the documentation from ``main``. Documented the parallel HDF5 save functions and corrected the description of ``GKSL.set_omega``.
 
 **********************************
 1.1.0 - 2026-11-20 Feature Release

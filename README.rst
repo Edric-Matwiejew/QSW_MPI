@@ -5,7 +5,7 @@ QSW_MPI
 Overview
 --------
 
-QSW_MPI provides a parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks, please consult the `documentation <https://qsw-mpi.readthedocs.io/en/latest/>`_, or preprint `article <https://arxiv.org/pdf/2003.02450.pdf>`_.
+QSW_MPI provides a parallel framework for quantum stochastic simulation. For an overview of package usage and the theoretical basis of quantum stochastic walks, please consult the `documentation <https://edric-matwiejew.github.io/QSW_MPI/>`_, or preprint `article <https://arxiv.org/pdf/2003.02450.pdf>`_.
 
 Requirements
 ------------
@@ -105,5 +105,5 @@ Other Files
 * docs/
     * Makefile - Documentation make script for Unix-like systems.
     * make.bat - Documentation build script for Windows systems.
-    * requirements.txt - Requirements to build documentation of Read the Docs.
+    * requirements.txt - Dependencies for the Sphinx documentation build.
     * source/ - Documentation source files and images.
