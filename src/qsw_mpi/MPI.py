@@ -449,7 +449,7 @@ class walk(object):
         :type root: integer
 
         :returns: :math:`p(t)` or :math:`(p(t_0),...,p(t_q))`.
-        :rtype: :math:`N`, or :math:`(q + 1) \\times N`, complex NumPy array.
+        :rtype: Complex NumPy array of shape ``(sites,)`` for a step or ``(sites, steps + 1)`` for a series on the root rank, otherwise ``None``.
         """
         if self.local_result.ndim == 1:
 
@@ -813,7 +813,7 @@ class GKSL(walk):
     :type H: :math:`N \\times N` complex SciPy CSR
 
     :param Ls: Generalised Lindblad operators :math:`L_k`.
-    :type Ls: :math:`N \\times N` complex SciPy CSR matrix
+    :type Ls: Sequence of :math:`N \\times N` complex SciPy CSR matrices
 
     :param taus: Coefficients :math:`\\tau_k` of the Lindblad operators :math:`L_k` (see Equation :eq:`eq:KL_eq`). If `None`, :math:`\\tau_k = 1`.
     :type taus: float array, optional
@@ -1084,7 +1084,7 @@ class GQSW(walk):
         :type root: integer, optional.
 
         :returns: :math:`p(t)` or :math:`(p(t_0),...,p(t_q))`.
-        :rtype: :math:`N`, or :math:`(q + 1) \\times N`, complex NumPy array.
+        :rtype: Complex NumPy array of shape ``(sites,)`` for a step or ``(sites, steps + 1)`` for a series on the root rank, otherwise ``None``.
         """
 
         populations = super().gather_populations(root)

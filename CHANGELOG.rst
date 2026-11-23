@@ -6,6 +6,7 @@ Changelog
 Unreleased
 **********
 
+* Added a Dicke superradiance example for the GKSL solver.
 * Fixed an out-of-bounds write when the LQSW solver constructs an operator with an empty row.
 * Moved the Python package to ``src/qsw_mpi/`` and the Fortran sources to ``native/``.
 * Removed the legacy benchmark scripts and the unused ``qsw_mpi.test`` script.

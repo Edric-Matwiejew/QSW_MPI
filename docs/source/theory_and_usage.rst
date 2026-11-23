@@ -564,12 +564,12 @@ calls methods from one of the following :class:`~qsw_mpi.MPI.walk` classes:
 
 -  :class:`~qsw_mpi.MPI.GQSW`: G-QSWs (Equation :eq:`eq:L_global` and :eq:`eq:nm_gqsw`).
 
--  :class:`~qsw_mpi.MPI.GKSL`: Walks obeying the GKSL master equation  (Equation :eq:`eq:gksl`).
+-  :class:`~qsw_mpi.MPI.GKSL`: Open systems obeying the GKSL master equation  (Equation :eq:`eq:gksl`).
 
-A :class:`~qsw_mpi.MPI.walk` object is instantiated by passing to it the relevant
-operators, coefficients and MPI-communicator. On doing so the
-distributed :math:`\tilde{\mathcal{L}}` is generated and its 1-norm
-series calculated [1]_. After this the user defines :math:`\rho(0)` and
+Each solver constructs the distributed superoperator
+:math:`\tilde{\mathcal{L}}` from the supplied operators, coefficients and MPI
+communicator and computes its one-norm. Higher-power norm estimates are
+computed when propagation first needs them [1]_. After this the user defines :math:`\rho(0)` and
 generates the distributed :math:`\tilde{\rho}(0)` via the
 :meth:`~qsw_mpi.MPI.walk.initial_state` method.
 
@@ -590,10 +590,11 @@ plus the local partition of the density operator. A vector passed to
 
 Simulations are carried out for a single time point with the :meth:`~qsw_mpi.MPI.walk.step`
 method or for a number of equally spaced points using the :meth:`~qsw_mpi.MPI.walk.series`
-method. These return :math:`\tilde{\rho}(t)` (or
-:math:`\tilde{\vec{\rho}}(t)`) as a distributed vectorized matrix(s)
-which can be reshaped and gathered to a specified MPI process via
-:meth:`~qsw_mpi.MPI.walk.gather_result`, or measured via :meth:`~qsw_mpi.MPI.walk.gather_populations`.
+method. Both methods store the distributed result on the walk. To collect
+the density matrix or the populations, all ranks call
+:meth:`~qsw_mpi.MPI.walk.gather_result` or :meth:`~qsw_mpi.MPI.walk.gather_populations`.
+The selected root receives the array (rank zero by default).
+
 By default, :meth:`~qsw_mpi.MPI.walk.save_result`,
 :meth:`~qsw_mpi.MPI.walk.save_populations` and :meth:`~qsw_mpi.MPI.walk.save_superoperator`
 gather their data on rank zero for serial output with h5py. Set
@@ -647,10 +648,13 @@ executed with the command,
 
 ::
 
-    mpirun -N <n> Python3 <program_file.py>
+    mpiexec -n <n> python <program_file.py>
 
 where ``<n>`` is a user-specified parameter equal to the number of MPI
-processes.
+processes. 
+
+For an example of a GKSL-based simulation, see the Dicke superradiance
+example in ``examples/4_gksl_superradiance.py``.
 
 Graph Demoralisation
 ~~~~~~~~~~~~~~~~~~~~
