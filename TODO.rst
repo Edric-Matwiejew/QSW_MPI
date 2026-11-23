@@ -2,11 +2,17 @@
 Todo
 ====
 
-In approximate order of importance:
-
-   #. Provide examples of quantum walks utilising the :class:`~qsw_mpi.MPI.GKSL` class.
-   #. Create an environment file for Anaconda.
-   #. Implement parallel-io operation using the Fortran HDF5 interface to remove the dependency on H5Py.
-   #. Implement the :class:`~qsw_mpi.MPI.walk` class and subclasses :class:`~qsw_mpi.MPI.LQSW`, :class:`~qsw_mpi.MPI.GQSW` and :class:`~qsw_mpi.MPI.GKSL` in Fortran to make possible python indepedant walk simulation.
-   #. Provide comprehensive documentation for the Fortran subroutines, compilable via Doxygen.
-   #. Implement dense BLAS operations to increase the scope of efficient walk simulation to dense systems.
+#. Include the GKSL examples in the repository.
+#. Create a conda environment file.
+#. Make h5py optional for simulations that do not use HDF5.
+#. Implement the walk classes in Fortran so simulations can run without Python.
+#. Document the Fortran subroutines with Doxygen.
+#. Add dense BLAS operations for simulations of dense systems.
+#. Profile the full-interval GKSL cooling slowdown, measuring adjoint setup,
+   norm estimation and Taylor products separately.
+#. Compare blocking and overlapped MPI exchange across nodes for the Ising and
+   shift jumps. Measure runtime and peak memory per rank to decide whether to
+   reuse the communication graph or change the default.
+#. Evaluate QuOp's HIP sparse matrix-vector and packing kernels on AMD GPUs.
+   Compare device-aware MPI with host staging and validate the cooling
+   trajectory against the CPU result.

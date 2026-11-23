@@ -23,3 +23,11 @@ operators
    :members:
    :undoc-members:
    :show-inheritance:
+
+parallel_io
+-----------
+
+The following functions write results using parallel HDF5. 
+
+.. automodule:: qsw_mpi.parallel_io
+   :members: save_result, save_populations, save_superoperator

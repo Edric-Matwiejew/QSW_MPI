@@ -119,6 +119,13 @@ def _write(comm, filename, action, datasets, dimensions=None):
 
 
 def save_result(self, filename, walkname, action='a'):
+    """Saves the density matrix at one or more times to an HDF5 dataset.
+
+    :param self: Walk instance.
+    :param filename: File basename.
+    :param walkname: Dataset name for the density matrix.
+    :param action: File access mode, append ('a') or overwrite ('w').
+    """
     n = self.size[0]
     local = self.local_result
     col, row = divmod(int(self.partition_table[self.rank]) - 1, n)
@@ -166,6 +173,13 @@ def _vertex_populations(self, first, local):
 
 
 def save_populations(self, filename, popname, action='a'):
+    """Saves the vertex populations at one or more times to an HDF5 dataset.
+
+    :param self: Walk instance.
+    :param filename: File basename.
+    :param popname: Dataset name for the vertex populations.
+    :param action: File access mode, append ('a') or overwrite ('w').
+    """
     n = self.size[0]
     first = (int(self.partition_table[self.rank]) - 1 + n) // (n + 1)
     local = self._get_local_populations()
@@ -179,6 +193,13 @@ def save_populations(self, filename, popname, action='a'):
 
 
 def save_superoperator(self, filename, operatorname, action='a'):
+    """Saves the superoperator to an HDF5 group as a CSR matrix.
+
+    :param self: Walk instance.
+    :param filename: File basename.
+    :param operatorname: Group name for the CSR matrix.
+    :param action: File access mode, append ('a') or overwrite ('w').
+    """
     comm = self.MPI_communicator
     start = int(self.SO_row_starts[0]) - 1
     total = comm.bcast(start + int(self.SO_nnz), root=comm.size - 1)

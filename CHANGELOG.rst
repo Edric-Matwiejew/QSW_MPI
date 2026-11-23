@@ -2,12 +2,23 @@
 Changelog
 =========
 
+**********
+Unreleased
+**********
+
+* Fixed an out-of-bounds write when the LQSW solver constructs an operator with an empty row.
+* Moved the Python package to ``src/qsw_mpi/`` and the Fortran sources to ``native/``.
+* Removed the legacy benchmark scripts and the unused ``qsw_mpi.test`` script.
+* Updated the Read the Docs build configuration. Documented the parallel HDF5 save functions and corrected the description of ``GKSL.set_omega``.
+
 **********************************
 1.1.0 - 2026-11-20 Feature Release
 **********************************
 
 * Added ``walk.initial_pure_state`` to initialise a distributed density operator from amplitudes supplied by one MPI rank.
 * Parallel writes now use the native Fortran HDF5 interface. Serial output uses h5py.
+* Added opt-in overlap of MPI communication and local computation during ``step`` and ``series`` via ``walk.overlap_communication``.
+* Fixed adjoint construction on MPI ranks with no local rows.
 * Reduced memory use during GKSL generator assembly and deferred higher-power norm estimates until propagation needs them.
 * Replaced the separate Makefile and setuptools build steps with a single ``python -m pip install .`` using scikit-build-core and CMake. The package now requires Python 3.9 or later and NumPy 2.0 or later.
 

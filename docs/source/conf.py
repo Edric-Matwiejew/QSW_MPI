@@ -15,7 +15,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath("../../src"))
 
-autodoc_mock_imports = ["mpi4py", "qsw_mpi.foperators", "qsw_mpi.fMPI", "qsw_mpi.parallel_io", "h5py"]
+autodoc_mock_imports = ["mpi4py", "qsw_mpi.foperators", "qsw_mpi.fMPI", "h5py"]
 
 numfig = True
 

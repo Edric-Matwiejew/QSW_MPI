@@ -909,6 +909,11 @@ class GKSL(walk):
         self.construct_time = time() - self.construct_time
 
     def set_omega(self, omega):
+        """Issues a warning because GKSL does not use the interpolation parameter.
+
+        :param omega: Interpolation parameter (ignored).
+        :type omega: float
+        """
         warnings.warn("set_omega() not supported by GKSL class, superoperator unchanged.")
 
     def initial_state(self, state):
